@@ -1,0 +1,443 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# 1 Linear Mixed-Effects Models: Basic Concepts and Examples
+
+```{r}
+options(paged.print = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(nlme)
+```
+
+## 1.1 A Simple Example of Random Effects
+
+```{r}
+Rail
+```
+
+```{r}
+fm1Rail.lm <- lm(travel ~ 1, data = Rail)
+summary(fm1Rail.lm)
+```
+
+```{r}
+coef(fm1Rail.lm)
+```
+
+```{r}
+Rail %>%
+  ggplot(aes(travel, Rail)) +
+  geom_point() +
+  geom_vline(xintercept = coef(fm1Rail.lm), color = "white") +
+  theme(panel.grid = element_blank())
+```
+
+```{r}
+fm2Rail.lm <- lm(travel ~ Rail - 1, data = Rail)
+summary(fm2Rail.lm)
+```
+
+```{r}
+Rail %>%
+  bind_cols(resid = resid(fm2Rail.lm)) %>%
+  ggplot(aes(resid, Rail)) +
+  geom_vline(xintercept = 0, color = "white") +
+  geom_point() +
+  theme(panel.grid = element_blank())
+```
+
+```{r}
+fm1Rail.lme <- lme(travel ~ 1, data = Rail, random = ~ 1 | Rail)
+summary(fm1Rail.lme)
+```
+
+```{r}
+fm1Rail.lmeML <- lme(travel ~ 1, data = Rail, random = ~ 1 | Rail, method = "ML")
+summary(fm1Rail.lmeML)
+```
+
+```{r}
+plot(fm1Rail.lme)
+```
+
+```{r}
+fm1Rail.lme$sigma
+fm1Rail.lmeML$sigma
+```
+
+```{r}
+intervals(fm1Rail.lme)
+```
+
+```{r}
+anova(fm1Rail.lme)
+```
+
+```{r}
+AIC(fm1Rail.lm, fm2Rail.lm, fm1Rail.lme, fm1Rail.lmeML)
+```
+
+## 1.2 A Randomized Block Design
+
+```{r}
+ergoStool
+```
+
+```{r}
+plot.design(ergoStool)
+```
+
+```{r}
+ergoStool %>%
+  group_by(Subject) %>%
+  summarize(mean = mean(effort)) %>%
+  arrange(desc(mean)) %>%
+  ggplot(aes(Subject, mean)) +
+  geom_point()
+```
+
+```{r}
+ergoStool %>%
+  group_by(Type) %>%
+  summarize(mean = mean(effort)) %>%
+  arrange(desc(mean)) %>%
+  ggplot(aes(Type, mean)) +
+  geom_point()
+```
+
+```{r}
+contrasts(ergoStool$Type)
+```
+
+```{r}
+fm2Stool <- lme(effort ~ Type, data = ergoStool, random = ~ 1 | Subject)
+summary(fm2Stool)
+```
+
+```{r}
+anova(fm2Stool)
+```
+
+```{r}
+fm3Stool <- lme(effort ~ Type - 1, data = ergoStool, random = ~ 1 | Subject)
+summary(fm3Stool)
+```
+
+```{r}
+anova(fm3Stool)
+```
+
+```{r}
+plot(fm2Stool)
+```
+
+```{r}
+intervals(fm2Stool)
+```
+
+```{r}
+plot(fm2Stool, form = resid(., type = "p") ~ fitted(.) | Subject, abline = 0)
+```
+
+## 1.3 Mixed-Effects Models for Replicated, Blocked Designs
+
+```{r}
+head(Machines)
+```
+
+```{r}
+with(Machines, interaction.plot(Machine, Worker, score, las = 1))
+```
+
+```{r}
+Machines %>%
+  group_by(Worker, Machine) %>%
+  summarize(mean = mean(score), .groups = "drop") %>%
+  ggplot(aes(Machine, mean, group = Worker)) +
+  geom_line(aes(color = Worker)) +
+  geom_point()
+```
+
+```{r}
+fm1Machine <- lme(
+  score ~ Machine,
+  data = Machines, random = ~ 1 | Worker
+)
+(fm1Machine)
+```
+
+```{r}
+fixef(fm1Machine)
+```
+
+```{r}
+52.3555
+52.3555 + 7.966667
+52.3555 + 13.9166
+```
+
+```{r}
+
+59.65 - 3.9833
+59.65 - 3.3111
+59.65
+```
+
+```{r}
+fm2Machine <- lme(
+  score ~ Machine,
+  data = Machines,
+  random = ~ 1 | Worker / Machine
+)
+fm2Machine
+```
+
+```{r}
+anova(fm1Machine, fm2Machine)
+```
+
+```{r}
+AIC(fm1Machine, fm2Machine)
+```
+
+```{r}
+cbind(Machines, f1 = fitted(fm1Machine), f2 = fitted(fm2Machine)) %>%
+  ggplot(aes(Machine)) +
+  geom_line(aes(y = f1, group = Worker, color = "red", alpha = 1 / 2)) +
+  geom_line(aes(y = f2, group = Worker, color = "blue", alpha = 1 / 2)) +
+  geom_point(aes(y = f1), color = "red", alpha = 1 / 2) +
+  geom_point(aes(y = f2), color = "blue", alpha = 1 / 2) +
+  geom_point(aes(y = score), alpha = 1 / 2) +
+  facet_wrap(~Worker)
+```
+
+```{r}
+MachinesUnbal <- Machines[-c(2, 3, 6, 8, 9, 12, 19, 20, 27, 33), ]
+table(MachinesUnbal$Machine, MachinesUnbal$Worker)
+```
+
+```{r}
+fm1MachinesU <- lme(
+  score ~ Machine,
+  data = MachinesUnbal,
+  random = ~ 1 | Worker / Machine
+)
+fm1MachinesU
+```
+
+```{r}
+intervals(fm1MachinesU)
+```
+
+```{r}
+fm4Stool <- lme(effort ~ Type, ergoStool, ~ 1 | Subject / Type)
+intervals(fm4Stool)
+```
+
+```{r}
+fm2Stool$sigma^2
+```
+
+```{r}
+(fm4Stool$sigma)^2 + 0.9995316^2
+```
+
+```{r}
+fm3Machine <- lme(
+  score ~ Machine,
+  data = Machines, random = ~ Machine - 1 | Worker
+)
+summary(fm3Machine)
+```
+
+```{r}
+anova(fm1Machine, fm2Machine, fm3Machine)
+```
+
+## 1.4 An Analysis of Covariance Model
+
+```{r}
+head(Orthodont)
+```
+
+```{r}
+OrthoFem <- Orthodont[Orthodont$Sex == "Female", ]
+OrthoFem
+```
+
+```{r}
+fm1OrthF.lis <- lmList(distance ~ age, data = OrthoFem)
+coef(fm1OrthF.lis)
+```
+
+```{r}
+plot(intervals(fm1OrthF.lis))
+```
+
+```{r}
+fm2OrthF.lis <- lmList(distance ~ I(age - 11), data = OrthoFem)
+plot(intervals(fm2OrthF.lis))
+```
+
+```{r}
+fm1OrthF <- lme(
+  distance ~ age,
+  data = OrthoFem, random = ~ 1 | Subject
+)
+summary(fm1OrthF)
+fm1OrthF$sigma
+```
+
+```{r}
+fm1OrthFM <- update(fm1OrthF, method = "ML")
+summary(fm1OrthFM)
+fm1OrthFM$sigma
+```
+
+```{r}
+fm2OrthF <- lme(
+  distance ~ age,
+  data = OrthoFem, random = ~ age | Subject
+)
+summary(fm2OrthF)
+fm2OrthF$sigma
+```
+
+```{r}
+anova(fm1OrthF, fm2OrthF)
+```
+
+```{r}
+random.effects(fm1OrthF)
+```
+
+```{r}
+coef(fm1OrthF)
+```
+
+```{r}
+plot(compareFits(coef(fm1OrthF), coef(fm1OrthFM)))
+```
+
+```{r}
+plot(compareFits(coef(fm2OrthF), coef(fm1OrthF)))
+```
+
+```{r}
+plot(augPred(fm1OrthF), aspect = "xy", grid = T)
+```
+
+```{r}
+plot(augPred(fm2OrthF), aspect = "xy", grid = T)
+```
+
+## 1.5 Models for Nested Classification Factors
+
+```{r}
+head(Pixel)
+```
+
+```{r}
+str(Pixel)
+```
+
+```{r}
+Pixel %>%
+  ggplot(aes(day, pixel)) +
+  geom_line(aes(group = Side, linetype = Side)) +
+  geom_point() +
+  facet_wrap(~Dog, nrow = 2) +
+  theme(panel.grid = element_blank())
+```
+
+```{r}
+fm1Pixel <- lme(pixel ~ day + I(day^2),
+  data = Pixel,
+  random = list(Dog = ~day, Side = ~1)
+)
+summary(fm1Pixel)
+```
+
+```{r}
+intervals(fm1Pixel)
+```
+
+```{r}
+plot(augPred(fm1Pixel))
+```
+
+```{r}
+VarCorr(fm1Pixel)
+```
+
+```{r}
+fm2Pixel <- update(fm1Pixel, random = ~ day | Dog)
+anova(fm1Pixel, fm2Pixel)
+```
+
+```{r}
+fm3Pixel <- update(fm1Pixel, random = ~ 1 | Dog / Side)
+anova(fm1Pixel, fm2Pixel, fm3Pixel)
+```
+
+```{r}
+fm4Pixel <- update(fm1Pixel, pixel ~ day + day^2 + Side)
+summary(fm4Pixel)
+```
+
+```{r}
+anova(fm1Pixel, fm2Pixel, fm3Pixel, fm4Pixel)
+```
+
+## 1.6 A Split-Plot Experiment
+
+```{r}
+fm1Oats <- lme(yield ~ ordered(nitro) * Variety,
+  data = Oats,
+  random = ~ 1 | Block / Variety
+)
+summary(fm1Oats)
+```
+
+```{r}
+anova(fm1Oats)
+```
+
+```{r}
+fm2Oats <- lme(yield ~ ordered(nitro) + Variety, data = Oats, random = ~ 1 | Block / Variety)
+anova(fm2Oats)
+summary(fm2Oats)
+```
+
+```{r}
+fm3Oats <- update(fm1Oats, yield ~ ordered(nitro))
+summary(fm3Oats)
+```
+
+```{r}
+fm4Oats <- lme(yield ~ nitro, data = Oats, random = ~ 1 | Block / Variety)
+summary(fm4Oats)
+```
+
+```{r}
+anova(fm1Oats, fm2Oats, fm3Oats, fm4Oats)
+```
+
+```{r}
+VarCorr(fm4Oats)
+```
+
+```{r}
+intervals(fm4Oats)
+```
+
+```{r, fig.width=6, fig.height=6}
+plot(augPred(fm4Oats), aspect = 2.5, layout = c(6, 3), between = list(x = c(0, 0, 0.5)))
+```
+
+## 1.7 Chapter Summary
