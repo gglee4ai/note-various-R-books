@@ -2,6 +2,7 @@
 *_temp
 *.RData
 *.nb.html
+**/.DS_Store
 .DS_Store
 ~$*
 __*
@@ -58,4 +59,3 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
-.DS_Store
