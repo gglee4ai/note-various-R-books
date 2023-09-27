@@ -1,0 +1,208 @@
+---
+title: "note12"
+output: html_notebook
+---
+
+```{r}
+plot(c(1,2,3), c(1,2,4))
+```
+
+```{r}
+plot(c(-3,3), c(-1,5), type = "n", xlab="x", ylab="y")
+```
+
+```{r}
+x <- c(1,2,3)
+y <- c(1,3,8)
+plot(x,y)
+lmout <- lm(y ~ x)
+abline(lmout)
+abline(2,2)
+lines(c(1.5, 2.5), c(3, 3))
+```
+
+```{r}
+plot(x, y, type = "l")
+```
+
+```{r}
+x <- rnorm(100)
+y <- rnorm(100)
+plot(density(x))
+lines(density(y), col = 2)
+```
+
+```{r}
+polyfit <- function(y, x, maxdeg) {
+  pwrs <- powers(x, maxdeg)
+  lmout <- list()
+  class(lmout) <- "polyreg"
+  for (i in 1:maxdeg) {
+    lmo <- lm(y ~ pwrs[, 1:i])
+    lmo$fitted.cvvalues <- lvoneout(y, pwrs[, 1:i, drop = F])
+    lmout[[i]] <- lmo
+  }
+  lmout$x <- x
+  lmout$y <- y
+  lmout
+}
+
+
+
+powers <- function(x, dg) {
+  pw <- matrix(x, nrow = length(x))
+  prod <- x
+  for (i in 2:dg) {
+    prod <- prod * x
+    pw <- cbind(pw, prod)
+  }
+  return(pw)
+}
+
+lvoneout <- function(y, xmat) {
+  n <- length(y)
+  predy <- vector(length = n)
+  for (i in 1:n) {
+    # regress, leaving out ith observation
+    lmo <- lm(y[-i] ~ xmat[-i, ])
+    betahat <- as.vector(lmo$coef)
+    predy[i] <- betahat %*% c(1, xmat[i, ])
+  }
+  return(predy)
+}
+
+poly <- function(x, cfs) {
+  val <- cfs[1]
+  prod <- 1
+  dg <- length(cfs) - 1
+  for (i in 1:dg) {
+    prod <- prod * x
+    val <- val + cfs[i + 1] * prod
+  }
+}
+
+print.polyreg <- function(fits) {
+  maxdeg <- length(fits) - 2
+  n <- length(fits$y)
+  tbl <- matrix(nrow = maxdeg, ncol = 1)
+  colnames(tbl) <- "MSPE"
+  for (i in 1:maxdeg) {
+    fi <- fits[[i]]
+    errs <- fits$y - fi$fitted.cvvalues
+    spe <- crossprod(errs, errs) # sum of squared prediction errors
+    tbl[i, 1] <- spe / n
+  }
+  cat("mean squared prediction errors, by degree\n")
+  print(tbl)
+}
+
+plot.polyreg <- function(fits) {
+  plot(fits$x, fits$y, xlab = "X", ylab = "Y")
+  maxdg <- length(fits) -2
+  cols <- c("red", "green", "blue")
+  dg <- curvecount <- 1
+  while (dg < maxdg) {
+    #prompt <- paste("RETURN for XV fit for degree", dg, "or type degree", "or q for quit")
+    #rl <- readline(prompt)
+    #dg <- if (rl == "") dg else if (rl != "q") as.integer(rl) else break
+    lines(fits$x, fits[[dg]]$fitted.values, col=cols[curvecount%%3 + 1])
+    dg <- dg + 1
+    curvecount <- curvecount +1
+  }
+}
+```
+
+```{r}
+set.seed(1234)
+n <- 60
+x <- (1:n) / n
+y <- vector(length = n)
+for (i in 1:n) y[i] <- sin((3 * pi / 2) * x[i]) + x[i]^2 + rnorm(1, mean = 0, sd = 0.5)
+plot(x, y)
+```
+
+```{r}
+dg <- 15
+(lmo <- polyfit(y, x, dg))
+```
+
+```{r}
+plot(lmo)
+```
+
+```{r}
+par(bg="yellow")
+plot(c(-3,3), c(-3,3))
+points(rnorm(100), rnorm(100), pch="+")
+```
+
+```{r}
+plot(c(-1, 1), c(-1, 1))
+text(0,0, "abc", cex=1.5)
+```
+
+```{r}
+d1 <- density(rnorm(100))
+d2 <- density(rnorm(100))
+str(d1)
+```
+
+```{r}
+xmin <- min(d1$x, d2$x)
+xmax <- max(d1$x, d2$x)
+ymin <- min(d1$y, d2$y)
+ymax <- max(d1$y, d2$y)
+plot(c(xmin, xmax), c(ymin, ymax), type = "n")
+lines(d1)
+lines(d2, col = 2)
+```
+
+```{r}
+f <- function(x) 1-exp(-x)
+curve(f, 0, 2)
+#polygon(c(1.2, 1.4, 1.4, 1.2), c(0, 0, f(1.3), f(1.3)), col="gray")
+polygon(c(1.2, 1.4, 1.4, 1.2), c(0, 0, f(1.3), f(1.3)), density=10)
+```
+
+```{r}
+x <- sort(runif(100))
+y <- rnorm(100)
+plot(x, y)
+lines(lowess(x, y), col = 2)
+```
+
+```{r}
+g <- function(t) (t^2 + 1)^0.5
+x <- seq(0,5,length=10000)
+y <- g(x)
+plot(x, y, type = "l")
+```
+
+```{r}
+curve((x^2+1)^0.5, 0, 5)
+```
+
+```{r}
+f <- function(x) (x^2+1)^0.5
+plot(f, 0, 5)
+```
+
+```{r}
+plot.function(f, 0, 5)
+```
+
+```{r}
+dev.list()
+```
+
+```{r}
+library(lattice)
+```
+
+```{r}
+a <- 1:10
+b <- 1:15
+eg <- expand.grid(x = a, y = b)
+eg$z <- eg$x^2 + eg$x * eg$y
+wireframe(z ~ x + y, eg)
+```

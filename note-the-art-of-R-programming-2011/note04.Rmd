@@ -1,0 +1,200 @@
+---
+title: "note04"
+output: html_notebook
+---
+
+```{r}
+j <- list(name = "Joe", salaray = 55000, union = T)
+j
+```
+
+```{r}
+jalt <- list("Joe", 55000, T)
+jalt
+```
+
+```{r}
+z <- vector(mode = "list")
+z[["abc"]] <- 3
+z
+```
+
+```{r}
+j[1:2]
+```
+
+```{r}
+j2 <- list(j, j)
+j2
+```
+
+```{r}
+j2[1]
+```
+
+```{r}
+try(j[[1:2]])
+```
+
+```{r}
+j2[[2]]
+```
+
+```{r}
+z <- list(a = "abc", b = 12)
+z
+```
+
+```{r}
+z$c <- "sailing"
+z
+```
+
+```{r}
+z[[4]] <- 28
+str(z)
+```
+
+```{r}
+z$b <- NULL
+z
+```
+
+```{r}
+c(list("Joe", 55000, T), list(5))
+```
+
+```{r}
+length(j)
+```
+
+```{r}
+text <- "the  here means that the first item in this line of output is
+item in this case our output consists of only one line and one
+item so this is redundant but this notation helps to read
+voluminous output that consists of many items spread over many
+lines for example if there were two rows of output with six items
+per row the second row would be labeled"
+txt <- trimws(strsplit(text, split = c(" ", "  "))[[1]])
+f <- function(word) ifelse(nchar(word) == 0, FALSE, TRUE)
+txt <- txt[sapply(txt, f)]
+txt
+```
+
+```{r}
+findwords <- function(x) {
+  uwords <- unique(x)
+  positions <- list()
+  for (w in uwords) {
+    positions[[w]] <- which(w == x)
+  }
+  positions
+}
+findwords(txt) |> head()
+```
+
+```{r}
+findwords2 <- function(x) {
+  wl <- list()
+  for (i in seq_along(txt)) {
+    wrd <- txt[i]
+    wl[[wrd]] <- c(wl[[wrd]], i)
+  }
+  wl
+}
+head(findwords2(text))
+```
+
+```{r}
+bench::mark(
+  findwords(text),
+  findwords2(text),
+  check = FALSE
+)
+```
+
+```{r}
+countwords <- function(x) {
+  words <- trimws(strsplit(text, split = c(" ", "  "))[[1]])
+  f <- function(word) ifelse(nchar(word) == 0, FALSE, TRUE)
+  words <- words[sapply(words, f)]
+  count <- list()
+  for (w in words) {
+    if (!w %in% names(count)) {
+      count[[w]] <- 1L
+    } else {
+      count[[w]] <- count[[w]] + 1L
+    }
+  }
+  count
+}
+head(countwords(text))
+```
+
+```{r}
+names(j)
+```
+
+```{r}
+ulj <- unlist(j)
+ulj
+```
+
+```{r}
+z <- list(a = 5, b = 12, c = 13)
+y <- unlist(z)
+class(y)
+unname(y)
+```
+
+```{r}
+lapply(list(1:3, 25:29), median)
+```
+
+```{r}
+sapply(list(1:3, 25:29), median)
+```
+
+```{r}
+# sord wordlist
+alphawl <- function(wrdlst) {
+  nms <- names(wrdlst)
+  sn <- sort(nms)
+  return(wrdlst[sn])
+}
+alphawl(findwords(txt))
+```
+
+```{r}
+freqwl <- function(wrdlst) {
+  freqs <- sapply(wrdlst, length)
+  return(wrdlst[order(freqs, decreasing = TRUE)])
+}
+freqwl(findwords(txt)) |> head()
+```
+
+```{r}
+g <- c("M", "F", "F", "I", "M", "M", "F")
+
+lapply(c("M", "F", "I"), function(gender) which(g == gender))
+```
+
+```{r}
+b <- list(u = 5, v = 12)
+c <- list(w = 13)
+a <- list(b, c)
+str(a)
+```
+
+```{r}
+a[[2]]$w
+```
+
+```{r}
+l <- c(list(a = 1, b = 2, c = list(d = 5, e = 9)))
+l
+```
+
+```{r}
+c(l, recursive = TRUE)
+```

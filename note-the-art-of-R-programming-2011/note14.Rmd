@@ -1,0 +1,245 @@
+---
+title: "note14"
+output: html_notebook
+---
+
+
+```{r}
+options(paged.print = FALSE, max.print = 100)
+```
+
+```{r}
+x <- runif(1000000)
+y <- runif(1000000)
+f1 <- function(x, y) x + y
+f2 <- function(x, y) {
+  z <- double(length(x))
+  for (i in seq_along(x)) {
+    z[i] <- x[i] + y[i]
+  }
+  z
+}
+
+bench::mark(
+  f1(x, y),
+  f2(x, y),
+  check = FALSE
+)
+```
+
+```{r}
+oddcount1 <- function(x) sum(x %% 2 == 1)
+oddcount2 <- function(x) {
+  c <- 0
+  for (i in seq_along(x)) {
+    if (x[i] %% 2 == 1) c <- c + 1
+  }
+  c
+}
+
+xx <- sample(1:1000000, 1000, replace = TRUE)
+bench::mark(
+  oddcount1(xx),
+  oddcount2(xx)
+)
+```
+
+```{r}
+g1 <- function(nreps) {
+  sum <- 0
+  for (i in seq_len(nreps)) {
+    xy <- rnorm(2)
+    sum <- sum + max(xy)
+  }
+  sum / nreps
+}
+```
+
+```{r}
+g2 <- function(nreps) {
+  xymat <- matrix(rnorm(2 * nreps), ncol = 2)
+  maxs <- pmax(xymat[, 1], xymat[, 2])
+  mean(maxs)
+}
+```
+
+```{r}
+nreps <- 100000
+bench::mark(
+  g1(nreps),
+  g2(nreps),
+  check = FALSE
+)
+```
+
+```{r}
+sim1 <- function(nreps) {
+  nb1 <- 10
+  n1 <- 18
+  n2 <- 13
+  count <- 0
+  for (i in seq_len(nreps)) {
+    nb2 <- 6
+    if (runif(1) < nb1 / n1) nb2 <- nb2 + 1
+    if (runif(1) < nb2 / n2) count <- count + 1
+  }
+  count / nreps
+}
+```
+
+```{r}
+sim2 <- function(nreps) {
+  nb1 <- 10
+  nb2 <- 6
+  n1 <- 18
+  n2 <- 13
+  u <- matrix(c(runif(2 * nreps)), nrow = nreps, ncol = 2)
+  simfun <- function(rw) {
+    if (rw[1] < nb1 / n1) nb2 <- nb2 + 1
+    rw[2] < nb2 / n2
+  }
+  z <- apply(u, 1, simfun)
+  mean(z)
+}
+```
+
+```{r}
+sim3 <- function(nreps) {
+  nb1 <- 10
+  nb2 <- 6
+  n1 <- 18
+  n2 <- 13
+  u <- matrix(c(runif(2 * nreps)), nrow = nreps, ncol = 2)
+  # set up the condition vector
+  cndtn <- u[, 1] <= nb1 / n1 & u[, 2] <= (nb2 + 1) / n2 |
+    u[, 1] > nb1 / n1 & u[, 2] <= nb2 / n2
+  return(mean(cndtn))
+}
+```
+
+```{r}
+bench::mark(
+  sim1(10000),
+  sim2(10000),
+  sim3(10000),
+  check = FALSE
+)
+```
+
+```{r}
+powers1 <- function(x, dg) {
+  pw <- matrix(x)
+  prod <- x
+  for (i in 2:dg) {
+    prod <- prod * x
+    pw <- cbind(pw, prod)
+  }
+  unname(pw)
+}
+powers1(1:2, 5)
+```
+
+```{r}
+powers2 <- function(x, dg) {
+  pw <- matrix(nrow = length(x), ncol = dg)
+  prod <- x
+  pw[, 1] <- prod
+  for (i in 2:dg) {
+    prod <- prod * x
+    pw[, i] <- prod
+  }
+  unname(pw)
+}
+powers2(1:2, 5)
+```
+
+```{r}
+powers3 <- function(x, dg) outer(x, 1:dg, "^")
+```
+
+```{r}
+powers3 <- function(x, dg) outer(x, 1:dg, "^")
+```
+
+```{r}
+powers4 <- function(x, dg) {
+  repx <- matrix(rep(x, dg), nrow = length(x))
+  t(apply(repx, 1, cumprod))
+}
+```
+
+```{r}
+x <- runif(100000)
+bench::mark(
+  powers1(x, 8),
+  powers2(x, 8),
+  powers3(x, 8),
+  powers4(x, 8)
+)
+```
+
+```{r}
+z <- runif(10)
+tracemem(z)
+z[3] <- 8
+tracemem(z)
+```
+
+```{r}
+m <- 5000
+n <- 1000
+
+z1 <- list()
+for (i in 1:m) z1[[i]] <- sample(1:10, n, replace = T)
+f1 <- function() {
+  #  lapply(z1, function(zz) zz[3] <- 8)
+  for (i in 1:m) z1[[i]][3] <- 8
+}
+
+z2 <- matrix(sample(1:10, m * n, replace = TRUE), nrow = m)
+f2 <- function() {
+  z2[, 3] <- 8
+}
+```
+
+```{r}
+bench::mark(f1(), f2(), check = FALSE)
+```
+
+```{r}
+x <- runif(1000000)
+Rprof()
+invisible(powers1(x, 8))
+Rprof(NULL)
+summaryRprof()
+```
+
+```{r}
+x <- runif(1000000)
+Rprof()
+invisible(powers2(x, 8))
+Rprof(NULL)
+summaryRprof()
+```
+
+```{r}
+x <- runif(1000000)
+Rprof()
+invisible(powers3(x, 8))
+Rprof(NULL)
+summaryRprof()
+```
+
+```{r}
+f <- function() {
+  set.seed(123)
+  x <- runif(1000000)
+  y <- runif(1000000)
+  z <- double(length(x))
+  for (i in seq_along(x)) z[i] <- x[i] + y[i]
+  z
+}
+
+cf <- compiler::cmpfun(f)
+bench::mark(f(), cf())
+```

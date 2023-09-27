@@ -1,0 +1,93 @@
+---
+title: "note11"
+output: html_notebook
+---
+
+```{r}
+grep("Pole", c("Equator", "North Pole", "South Pole"))
+grep("pole", c("Equator", "North Pole", "South Pole"))
+```
+
+```{r}
+nchar("South Pole")
+```
+
+```{r}
+paste("North", "Pole")
+```
+
+```{r}
+paste0("North", "Pole")
+```
+
+```{r}
+i <- 8
+s <- sprintf("the square of %d is %d", i, i^2)
+s
+```
+
+```{r}
+substr("Equator", 3, 5)
+```
+
+```{r}
+strsplit("6-16-2011", split = "-")
+```
+
+```{r}
+regexpr("uat", "Equator")
+```
+
+```{r}
+gregexpr("iss", "Mississippi")
+```
+
+```{r}
+grep("[au]", c("Equator", "North Pole", "South Pole"))
+```
+
+```{r}
+grep("o.e", c("Equator", "North Pole", "South Pole"))
+```
+
+```{r}
+grep("[Nn]..t", c("Equator", "North Pole", "South Pole"))
+```
+
+```{r}
+grep(".", c("abc", "de", "f.g"))
+```
+
+```{r}
+grep("\\.", c("abc", "de", "f.g"))
+```
+
+```{r}
+testsuffix <- function(fn, suff) {
+  parts <- strsplit(fn, ".", fixed = TRUE)
+  nparts <- length(parts[[1]])
+  return(parts[[1]][nparts] == suff)
+}
+testsuffix("x.abc", "abc")
+testsuffix("x.abc", "ab")
+testsuffix("x.y.abc", "abc")
+```
+
+```{r}
+strsplit("This is.tital.aldi", ".", fixed = TRUE)
+```
+
+```{r}
+files <- list()
+for (i in 1:5) {
+  fname <- paste0("output/q", i, ".pdf")
+  files[[i]] <- fname
+  pdf(fname)
+  hist(rnorm(100, sd = 1))
+  dev.off()
+}
+```
+
+```{r}
+lapply(files, file.remove)
+```
