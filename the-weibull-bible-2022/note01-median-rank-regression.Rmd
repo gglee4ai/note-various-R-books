@@ -1,0 +1,216 @@
+---
+title: "Median Rank Regression"
+output: html_notebook
+---
+
+```{r, warning=FALSE}
+library(tidyverse)
+# library(WeibullR)
+# library(weibulltools)
+# library(SMRD)
+```
+
+# Median percent 계산
+
+## Monte Carlo
+
+```{r}
+N <- 5  # 5개를 뽑았을 때
+```
+
+균등 분포에서 5개의 숫자를 뽑았을 때, 그 숫자들의 median 위치를 계산해 보자 1. 랜덤으로 5개 뽑는다 2. 크기별로 정렬한다. 3. 위치별 중앙값을 구한다.
+
+```{r}
+R <- 100000 # 시물레이션
+res_list <- lapply(1:R, \(x) runif(N))   # Uniform 분포에서 5개를 뽑음
+res_sorted <- lapply(res_list, sort)     # 크기순 정렬
+res_sorted |> 
+  unlist() |> 
+  matrix(ncol = N, byrow = TRUE) |>  # matrix로 바꾼 후 
+  apply(2, median) # 각 열별로 median을 구함 
+```
+
+## linear conjecture
+
+The Weibull bible에서 제안한 식
+
+```{r}
+linear_conjecture <- function(N) {
+  stopifnot(length(N) == 1)
+  stopifnot(all.equal(N, as.integer(N))) # N must be a integer number
+  i <- 1:N
+  n <- .5^(1/N)
+  m <- (2 * n - 1)*(1 / (N - 1))
+  b <- n - (2*N/(N-1)) * (n - .5)
+  return(m * i + b)
+}
+linear_conjecture(N)
+```
+
+## beta function
+
+```{r}
+beta_func <- function(N) {
+  qbeta(1/2, shape1 = 1:N, shape2 = N:1)
+}
+beta_func(N)
+```
+
+## Benard
+
+```{r}
+Benard <- function(N) {
+  i <- 1:N
+  (i + .3) / (N + .4)
+}
+Benard(N)
+```
+
+# Example: Cement
+
+```{r}
+strength <- c(808, 1591, 842, 1638, 1422, 1015) # compressive strength 
+
+df <- tibble(strength = sort(strength))
+df <- df |> mutate(
+  medrank = beta_func(length(strength)),
+  #medrank = linear_conjecture(length(strength)),
+  pseudo_x = log(strength),
+  pseudo_y = log(log(1 / (1 - medrank)))
+)
+df
+```
+
+```{r}
+df |> 
+  ggplot(aes(pseudo_x, pseudo_y)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE)
+```
+
+## Weibull bible
+
+The Weibull bible에서는 그냥 y on x로 계수를 구해서, 다른 방법으로 구한 계수와는 다름
+
+
+```{r}
+# model from weibull bible
+fit_wb <- lm(pseudo_y ~ pseudo_x, data = df)
+summary(fit_wb)
+```
+
+```{r}
+c <- coef(fit_wb)
+fit_wb_coef <- c(c[2], exp(-(c[1]/c[2])))  # shape (beta), scale (eta)
+names(fit_wb_coef) <- c("shape", "scale")
+fit_wb_coef
+```
+
+
+## lm 이용
+
+
+
+
+
+일반적인 신뢰성 공학에서는 x on y 로 계수를 구함
+
+```{r}
+# model reliability engineering
+fit_re <- lm(pseudo_x ~ pseudo_y, data = df) # NOTE: x on y 임. 일반적으로 y on x
+summary(fit_re)
+```
+
+```{r}
+c <- coef(fit_re)
+fit_re_coef <- c(1 / coef(fit_re)[2], exp(coef(fit_re)[1]))
+names(fit_re_coef) <- c("shape", "scale")
+fit_re_coef
+```
+
+
+## WeibullR 
+
+MRRw2p
+
+```{r}
+fit_wr <- WeibullR::MRRw2p(strength, show = TRUE)
+fit_wr
+```
+
+```{r}
+fit_wr_coef <- c(fit_wr["Beta"], fit_wr["Eta"])
+names(fit_wr_coef) <- c("shape", "scale")
+fit_wr_coef
+```
+
+
+
+## weibulltools
+
+
+```{r}
+df$status <- rep(1, length = nrow(df))
+df_tbl <- weibulltools::reliability_data(df, x = strength, status = status)
+df_tbl
+```
+
+```{r}
+prob_tbl <- weibulltools::estimate_cdf(x = df_tbl, methods = "mr")
+prob_tbl
+```
+
+```{r}
+fit_wt <- weibulltools::rank_regression(x = prob_tbl, distribution = "weibull")
+fit_wt
+```
+
+```{r}
+fit_wt_coef <- fit_wt$shape_scale_coefficients
+fit_wt_coef <- fit_wt_coef[c(2, 1)]
+names(fit_wt_coef) <- c("shape", "scale")
+fit_wt_coef
+```
+
+
+
+## fitdistr: MLE
+
+```{r}
+MASS::fitdistr(strength, densfun = "weibull") # MLE 이용 
+```
+
+
+## fitdistrplus:MLE
+
+```{r}
+fitdistrplus::fitdist(strength, distr = "weibull", method = "mle")
+```
+
+## SMRD: MLE
+
+```{r}
+smrd_ld <- SMRD::frame.to.ld(df, response.column = 1, time.unit = "Strength")
+fit_sm <- SMRD::mlest(smrd_ld, distribution = "weibull")
+fit_sm
+```
+
+```{r}
+SMRD::event.plot(smrd_ld)
+```
+
+```{r}
+print(smrd_ld)
+```
+
+```{r}
+summary(smrd_ld)
+```
+
+```{r}
+plot(smrd_ld, distribution = "weibull")
+```
+
+```{r}
+plot(smrd_ld, distribution = "lognormal")
+```
