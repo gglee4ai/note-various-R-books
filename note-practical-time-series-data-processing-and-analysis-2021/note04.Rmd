@@ -1,0 +1,674 @@
+---
+title: "note04"
+output: html_notebook
+---
+
+```{r}
+load("./data-tidied/dataset.rdata")
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(ggplot2)
+theme_set(theme_gray(base_family = "NanumGothic"))
+```
+
+# 4 시계열 데이터 처리
+
+## 4.1 오늘 며칠일까?: 시간 정보 추출
+
+```{r}
+now.date <- Sys.time()
+now.date
+```
+
+```{r}
+now.datec <- as.character(now.date)
+now.datec
+```
+
+```{r}
+year(now.date)
+month(now.date)
+day(now.date)
+wday(now.date)
+hour(now.date)
+minute(now.date)
+second(now.date)
+yday(now.date)
+week(now.date)
+quarter(now.date)
+semester(now.date)
+am(now.date)
+pm(now.date)
+leap_year(now.date)
+```
+
+```{r}
+wday(now.date, label = TRUE, abbr = FALSE)
+```
+
+## 4.2 며칠 지났을까: 시간 기간 연산
+
+```{r}
+as.Date("2021-01-01") - as.Date("1980-01-01")
+```
+
+```{r}
+today <- today()
+today
+```
+
+```{r}
+now <- now()
+now
+```
+
+```{r}
+today + 100
+```
+
+```{r}
+today - months(2)
+class(months(2))
+```
+
+```{r}
+today - years(1)
+```
+
+```{r}
+int <- interval(as.Date("1980-01-01"), as.Date("2021-12-31"))
+int
+```
+
+```{r}
+as.period(int)
+```
+
+```{r}
+as.duration(int)
+```
+
+```{r}
+int1 <- "1980-01-01" %--% "2021-12-31"
+int1
+```
+
+```{r}
+leap_year(2020)
+```
+
+```{r}
+as.Date("2020-01-01") + years(1)
+```
+
+```{r}
+as.Date("2021-01-01") + dyears(1)
+```
+
+```{r}
+as.Date("2020-02-01") + months(1)
+```
+
+```{r}
+as.Date("2020-02-01") + dmonths(1)
+```
+
+```{r}
+as.Date("2021-02-01") + months(1)
+```
+
+```{r}
+as.Date("2021-02-01") + dmonths(1)
+```
+
+## 4.3 이번 주 마지막 날은 며칠일까?: 시간 반올림
+
+```{r}
+x <- as.Date("2022-09-14 13:45:40")
+x
+```
+
+```{r}
+round_date(x, "week")
+floor_date(x, "week")
+ceiling_date(x, "week")
+```
+
+```{r}
+round_date(x, "month")
+floor_date(x, "month")
+ceiling_date(x, "month")
+```
+
+```{r}
+round_date(x, "year")
+floor_date(x, "year")
+ceiling_date(x, "year")
+```
+
+```{r}
+days_in_month(as.Date("2021-09-01"))
+```
+
+## 4.4 주간, 월간 데이터 합계, 평균은?: 시간 그루핑
+
+```{r}
+employees.by.year <-
+  employees |>
+  mutate(year = year(time)) |>
+  group_by(year) |>
+  summarize(
+    total.year = sum(total),
+    employees.edu = sum(employees.edu)
+  )
+employees.by.year
+```
+
+```{r}
+employees.by.year |>
+  ggplot(aes(as.factor(year), total.year)) +
+  geom_line(aes(group = 1)) +
+  geom_text(aes(label = scales::number(total.year, big.mark = ",")),
+    size = 3, vjust = 1.5
+  ) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  labs(title = "연도별 취업자수", x = "연도", y = "취업자수")
+```
+
+```{r}
+library(tsibble)
+mean.covid19.by.age <-
+  covid19 |>
+  mutate(yearmon = yearmonth(date)) |>
+  group_by(yearmon) |>
+  summarize(
+    `01대` = mean(`0-9세`),
+    `10대` = mean(`10-19세`),
+    `20대` = mean(`20-29세`),
+    `30대` = mean(`30-39세`),
+    `40대` = mean(`40-49세`),
+    `50대` = mean(`50-59세`),
+    `60대` = mean(`60-69세`),
+    `70대` = mean(`70-79세`),
+    `80대` = mean(`80세 이상`),
+  )
+mean.covid19.by.age
+```
+
+```{r}
+mean.covid19.by.age |>
+  tidyr::pivot_longer(2:10, names_to = "category") |>
+  ggplot(aes(yearmon, value)) +
+  geom_line(aes(group = category, color = category)) +
+  labs(
+    title = "월간 평균 코로나 확진자수",
+    x = "일자",
+    y = "평균 확진자",
+    color = "세대"
+  )
+```
+
+```{r}
+# install.packages("tibbletime")
+library(tibbletime)
+as_tbl_time(covid19, index = date) |>
+  collapse_by("weekly") |>
+  group_by(date) |>
+  summarize(
+    `01대` = mean(`0-9세`),
+    `10대` = mean(`10-19세`),
+    `20대` = mean(`20-29세`),
+    `30대` = mean(`30-39세`),
+    `40대` = mean(`40-49세`),
+    `50대` = mean(`50-59세`),
+    `60대` = mean(`60-69세`),
+    `70대` = mean(`70-79세`),
+    `80대` = mean(`80세 이상`),
+  ) |>
+  tidyr::gather(category, value, 2:10) |>
+  ggplot(aes(date, value)) +
+  geom_line(aes(group = category, color = category)) +
+  labs(
+    title = "주간 평균 코로나 확진자수",
+    x = "월",
+    y = "평균 확진자",
+    color = "세대"
+  )
+```
+
+```{r}
+library(timetk)
+covid19 |>
+  summarize_by_time(
+    .date_var = date,
+    .by = "week",
+    `01대` = mean(`0-9세`),
+    `10대` = mean(`10-19세`),
+    `20대` = mean(`20-29세`),
+    `30대` = mean(`30-39세`),
+    `40대` = mean(`40-49세`),
+    `50대` = mean(`50-59세`),
+    `60대` = mean(`60-69세`),
+    `70대` = mean(`70-79세`),
+    `80대` = mean(`80세 이상`)
+  ) |>
+  tidyr::gather(category, value, 2:10) |>
+  ggplot(aes(date, value)) +
+  geom_line(aes(group = category, color = category)) +
+  labs(
+    title = "주간 평균 코로나 확진자수",
+    x = "월",
+    y = "평균 확진자",
+    color = "세대"
+  )
+```
+
+```{r}
+employees |>
+  summarize_by_time(
+    .date_var = time,
+    .by = "month",
+    total.year = sum(total),
+    employees.edu = sum(employees.edu)
+  ) |>
+  head(10)
+```
+
+```{r}
+employees.tsibble |>
+  index_by(yearqtr = ~ yearquarter(.)) |>
+  summarize(sum.qtrly = sum(total))
+```
+
+```{r}
+covid19.tsibble[, c(1, 3)] |>
+  index_by(yw = ~ yearweek(.)) |>
+  summarize(sum.weekly = sum(`0-9세`))
+```
+
+```{r}
+covid19.tsibble[, c(1, 3)] |>
+  index_by(twomonth = ~ floor_date(., "2 month")) |>
+  summarize(sum.2month = sum(`0-9세`))
+```
+
+```{r}
+covid19.tsibble[, c(1, 3)] |>
+  index_by(fourday = ~ floor_date(., "4 day")) |>
+  summarize(sum.4days = sum(`0-9세`))
+```
+
+```{r}
+library(xts)
+apply.quarterly(employees.xts, sum)
+```
+
+```{r}
+apply.yearly(employees.xts, sum) |>
+  plot.xts()
+```
+
+```{r}
+apply.monthly(covid19.xts[, 1], sum) |>
+  plot(main = "월별 0-9세 코로나 확진자수")
+```
+
+```{r}
+apply.quarterly(covid19.xts[, 1], sum) |>
+  plot.xts(main = "분기별 0-9세 코로나 확진자수")
+```
+
+## 4.5 주식 시가, 고가, 저가, 종가는 어떻게 구할까? OHLC
+
+```{r}
+as_tbl_time(covid19, index = date) |>
+  collapse_by("weekly") |>
+  group_by(date) |>
+  summarize(
+    Open = first(`0-9세`),
+    High = max(`0-9세`),
+    Low = min(`0-9세`),
+    Close = last(`0-9세`)
+  )
+```
+
+```{r}
+to.period(covid19.xts, method = "months", OHLC = TRUE)
+```
+
+## 4.6 3일 평균, 5일 합계는: 시간 롤링
+
+```{r}
+library(zoo)
+employees |>
+  mutate(
+    ma3 = rollmean(total, k = 3, fill = NA),
+    sum3 = rollapply(total, 3, sum, fill = NA)
+  ) |>
+  select(time, total, ma3, sum3) |>
+  ggplot(aes(time)) +
+  geom_line(aes(y = total, group = 1, color = "월간")) +
+  geom_line(aes(y = ma3, group = 1, color = "3개월 평균")) +
+  labs(y = "취업자수", x = "연도") +
+  scale_color_manual(values = c(
+    "월간" = "red",
+    "3개월 평균" = "blue"
+  ))
+```
+
+```{r}
+ma3 <- slidify(mean, .period = 3, .align = "center")
+sum3 <- slidify(sum, .period = 3, .align = "center")
+class(ma3)
+```
+
+```{r}
+employees |>
+  mutate(
+    ma3 = ma3(total),
+    sum3 = sum3(total)
+  ) |>
+  ggplot(aes(time)) +
+  geom_line(aes(y = total, group = 1, color = "월간")) +
+  geom_line(aes(y = ma3, group = 1, color = "3개월 평균")) +
+  labs(y = "취업자수", x = "연도") +
+  scale_color_manual(values = c(
+    "월간" = "red",
+    "3개월 평균" = "blue"
+  ))
+```
+
+```{r}
+rollapply(employees.xts, width = 3, FUN = mean) |>
+  head()
+```
+
+## 4.7 지난 달 데이터는?: 필터링(subsetting)
+
+```{r}
+covid19 |>
+  filter(date >= as.Date("2020-10-01") & date <= as.Date("2020-10-10"))
+```
+
+```{r}
+covid19 |>
+  filter(between(date, as.Date("2021-01-01"), as.Date("2021-01-15")))
+```
+
+```{r}
+employees |>
+  filter(year(time) == 2019 & month(time) == 5)
+```
+
+```{r}
+covid19 |>
+  filter(between(day(date), 3, 7))
+```
+
+```{r}
+covid19 |>
+  filter_by_time(
+    .date_var = date,
+    .start = "2020-10-01",
+    .end = "2020-10-05"
+  )
+```
+
+```{r}
+covid19 |>
+  filter(`0-9세` != 0) |>
+  filter_period(
+    .date_var = date,
+    .period = "1 month",
+    `0-9세` == max(`0-9세`)
+  )
+```
+
+```{r}
+covid19.xts["2020-10-02"]
+```
+
+```{r}
+covid19.xts["2020-10-01/2020-10-10"]
+```
+
+```{r}
+covid19.xts["2021-02-05/"]
+```
+
+```{r}
+covid19.xts["/2020-04-11"]
+```
+
+## 4.8 월별, 분기별, 연별 증감량
+
+```{r}
+cbind(
+  연도 = students$연도,
+  학생수계 = students$학생수계,
+  전년 = students |>
+    lag(1) |>
+    select(학생수계) |>
+    rename(전년 = 학생수계)
+)
+```
+
+```{r}
+students_lag <-
+  students |>
+  select(연도, 학생수계) |>
+  mutate(전년 = lag(학생수계, 1)) |>
+  mutate(
+    증감 = 학생수계 - 전년,
+    증감율 = round((학생수계 / 전년) - 1, 3) * 100
+  )
+students_lag
+```
+
+```{r}
+students_lag |>
+  ggplot(aes(as.factor(year(연도)), 증감)) +
+  geom_line(aes(group = 1)) +
+  geom_point() +
+  ggrepel::geom_text_repel(aes(label = scales::comma(증감)), vjust = 1, size = 3) +
+  labs(
+    title = "전년 대비 전체 학생수 증감 추이",
+    x = "연도",
+    y = "학생수 증감량"
+  ) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+```{r}
+students.tsibble |>
+  select(1, 2) |>
+  mutate(증감 = difference(학생수계, lag = 1)) |>
+  mutate(증감율 = round(증감 / 학생수계, 3) * 100)
+```
+
+```{r}
+employees |>
+  mutate(증감 = difference(total, lag = 1)) |>
+  mutate(증감율 = round((증감 / total), 3) * 100) |>
+  select(1, 2, 4, 5)
+```
+
+```{r}
+students.xts$증감 <- diff(students.xts[, 2])
+students.xts$증감률 <- round((students.xts$증감 / students.xts$학생수계), 3) * 100
+students.xts[, c("유치원", "증감", "증감률")]
+```
+
+```{r}
+par(family = "NanumGothic")
+plot.xts(students.xts[, "증감률"],
+  main = "전년 대비 유치원 학생수 증감률"
+)
+```
+
+```{r}
+employees.xts$증감 <- diff(employees.xts$total)
+employees.xts$증감률 <- round((employees.xts$증감 / employees.xts$total), 3) * 100
+employees.xts[, c("total", "증감", "증감률")] |>
+  head(10)
+```
+
+```{r}
+par(family = "NanumGothic")
+plot.xts(employees.xts[, c("증감률")], main = "전월 대비 전체 취업자 증감률")
+```
+
+## 4.9 월 비중 백분율, 연 비중 백분율
+
+```{r}
+employees |>
+  group_by(year(time)) |>
+  mutate(sum.by.year = sum(total)) |>
+  ungroup() |>
+  mutate(rate.by.year = round(total / sum.by.year, 3) * 100)
+```
+
+```{r}
+covid19 |>
+  group_by(yearmonth(date)) |>
+  mutate(sum.by.month = sum(`0-9세`)) |>
+  ungroup() |>
+  mutate(rate.by.month = round(`0-9세` / sum.by.month, 3) * 100) |>
+  select(date, `0-9세`, sum.by.month, rate.by.month)
+```
+
+```{r}
+covid19 |>
+  group_by(year(date), month(date), week(date)) |>
+  mutate(sum.by.week = sum(`0-9세`)) |>
+  ungroup() |>
+  mutate(rate.by.week = round(`0-9세` / sum.by.week, 3) * 100) |>
+  select(date, `0-9세`, sum.by.week, rate.by.week)
+```
+
+```{r}
+employees.tsibble |>
+  index_by(yearqtr = ~ yearquarter(.)) |>
+  mutate(sum.qtrly = sum(total)) |>
+  mutate(rate.qtrly = total / sum.qtrly)
+```
+
+```{r}
+employees.tsibble |>
+  index_by(year = ~ year(.)) |>
+  mutate(sum.year = sum(total)) |>
+  mutate(rate.year = (total / sum.year) * 100)
+```
+
+## 4.10 월별, 분기별, 연별 누적 합계
+
+```{r}
+employees |>
+  mutate(cumsum = cumsum(total)) |>
+  select(time, total, cumsum)
+```
+
+```{r}
+covid19 |>
+  mutate(cumsum = cumsum(`0-9세`)) |>
+  select(date, `0-9세`, cumsum) |>
+  ggplot(aes(date, cumsum)) +
+  geom_line(aes(group = 1)) +
+  labs(title = "코로나 확진자 누적 합계(0-9세)", x = "날짜", y = "누적합계") +
+  scale_x_date(date_breaks = "1 month", date_labels = "%y.%m") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+```{r}
+employees |>
+  group_by(year(time)) |>
+  mutate(
+    cumsum.total = cumsum(total),
+    cumsum.edu = cumsum(employees.edu)
+  ) |>
+  select(time, total, cumsum.total, employees.edu, cumsum.edu)
+```
+
+```{r}
+employees.tsibble |>
+  index_by(yearqtr = ~ yearquarter(.)) |>
+  mutate(cumsum.qtrly = cumsum(total)) |>
+  select(yearqtr, cumsum.qtrly)
+```
+
+```{r}
+covid19.tsibble[, c(1, 3)] |>
+  index_by(yearweek = ~ yearweek(.)) |>
+  mutate(cumsum.weekly = cumsum(`0-9세`))
+```
+
+```{r}
+do.call(rbind, lapply(split(employees.xts, f = "year"), cumsum)) |>
+  head(15)
+```
+
+## 4.11 동월별, 동 분기별, 동년별 플롯
+
+```{r}
+employees |>
+  mutate(year = year(time)) |>
+  ggplot(aes(as.factor(year), total)) +
+  geom_boxplot() +
+  geom_jitter(alpha = 0.2) +
+  labs(title = "동년별 취업자 분포", x = "연도", y = "취업자수")
+```
+
+```{r}
+employees |>
+  mutate(month = month(time)) |>
+  ggplot(aes(as.factor(month), total)) +
+  geom_boxplot() +
+  geom_jitter(alpha = 0.2) +
+  labs(title = "동월별 취업자 분포", x = "연도", y = "취업자수")
+```
+
+```{r}
+employees |>
+  mutate(quarter = quarter(time)) |>
+  ggplot(aes(as.factor(quarter), total)) +
+  geom_boxplot() +
+  geom_jitter(alpha = 0.2) +
+  labs(title = "동분기별 취업자 분포", x = "연도", y = "취업자수")
+```
+
+```{r}
+covid19 |>
+  mutate(month = month(date)) |>
+  ggplot(aes(as.factor(month), `0-9세`)) +
+  geom_boxplot() +
+  geom_jitter(alpha = 0.2) +
+  labs(title = "동월별 확진자 분포", x = "월", y = "확진자수")
+```
+
+```{r}
+covid19 |>
+  mutate(wday = wday(date, label = TRUE)) |>
+  ggplot(aes(wday, `50-59세`)) +
+  geom_boxplot() +
+  geom_jitter(alpha = 0.2) +
+  labs(title = "동요일별 확진자 분포", x = "요일", y = "확진자수")
+```
+
+```{r}
+employees |>
+  timetk::plot_seasonal_diagnostics(
+    .date_var = time,
+    .value = total,
+    .title = "전체 취업자의 주기별 플롯"
+  )
+```
+
+```{r, fig.asp=1}
+covid19 |>
+  timetk::plot_seasonal_diagnostics(
+    .date_var = date,
+    .value = `0-9세`,
+    .title = "코로나  확진자(0-9)세의 주기별 플롯"
+  )
+```
