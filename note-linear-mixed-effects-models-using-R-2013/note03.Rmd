@@ -1,0 +1,378 @@
+---
+title: "note03"
+output: html_notebook
+---
+
+# 3 Data Exploration
+
+## 3.2 ARMD Trial: Visual Acuity
+
+```{r}
+data(armd.wide, armd0, package = "nlmeU")
+```
+
+```{r}
+library(lattice)
+```
+
+```{r}
+armd0.subset <- subset(armd0, as.numeric(subject) %in% seq(1, 240, 10))
+armd0.subset
+```
+
+```{r}
+xy1 <- xyplot(visual ~ jitter(time) | treat.f,
+  groups = subject,
+  data = armd0.subset,
+  type = "l",
+  lty = 1
+)
+update(xy1,
+  xlab = "Time (in weeks)",
+  ylab = "Visual acuity",
+  grid = "h"
+)
+detach(package:lattice)
+```
+
+```{r}
+table(armd.wide$miss.pat)
+```
+
+```{r}
+with(armd.wide, table(miss.pat))
+```
+
+```{r}
+xtabs(~miss.pat, armd.wide)
+```
+
+```{r}
+#attach(armd0)
+flst <- list(armd0$time.f, armd0$treat.f)
+tN <- tapply(armd0$visual, flst, FUN = function(x) length(x[!is.na(x)]))
+tN
+```
+
+```{r}
+tMn <- tapply(armd0$visual, flst, FUN = mean)
+tMd <- tapply(armd0$visual, flst, FUN = median)
+res <- cbind(tN, tMn, tMd)
+res
+```
+
+```{r}
+nms1 <- rep(c("P", "A"), 3)
+nms2 <- rep(c("n", "Mean", "Mdn"), rep(2, 3))
+colnames(res) <- paste(nms1, nms2, sep = ":")
+res
+```
+
+```{r}
+library(lattice)
+bw1 <- bwplot(visual ~ time.f | treat.f, data = armd0)
+xlims <- c("Base", "4\nwks", "12\nwks", "24\nwks", "52\nwks")
+update(bw1, xlim = xlims, pch = "|")
+detach(package:lattice)
+```
+
+```{r}
+mnt.pat <- c("----", "---X", "--XX", "-XXX", "XXXX")
+armd.wide.mnt <- subset(armd.wide, miss.pat %in% mnt.pat)
+armd.wide.mnt
+```
+
+```{r}
+dim(armd.wide.mnt)
+levels(armd.wide.mnt$miss.pat)
+```
+
+```{r}
+armd.wide.mnt1 <- within(armd.wide.mnt, {
+  miss.pat <- factor(miss.pat, levels = mnt.pat)
+})
+levels(armd.wide.mnt1$miss.pat)
+```
+
+```{r}
+with(armd.wide.mnt1, {
+  fl <- list(treat.f, miss.pat)
+  tapply(subject, fl, FUN = function(x) length(x[!is.na(x)]))
+})
+```
+
+```{r}
+visual.x <- subset(armd.wide, select = c(visual0:visual52))
+visual.x
+```
+
+```{r}
+varx <- var(visual.x, use = "complete.obs")
+varx
+```
+
+```{r}
+cor(visual.x, use = "complete.obs")
+```
+
+```{r}
+diag(varx)
+```
+
+```{r}
+cov2cor(varx)
+```
+
+## 3.3 PRT Study: Muscle Fiber Specific Force
+
+```{r}
+data(prt.subjects, prt, package = "nlmeU")
+prt.subjects
+prt
+```
+
+```{r}
+with(prt.subjects, tapply(bmi, prt.f, summary))
+```
+
+```{r}
+by(subset(prt.subjects, select = -id), prt.subjects$prt.f, summary)
+```
+
+```{r}
+fibL <- with(
+  prt,
+  tapply(spec.fo, list(id = id, fiberF = fiber.f, occF = occ.f), length)
+)
+fibL
+```
+
+```{r}
+dimnms <- dimnames(fibL)
+names(dimnms)
+```
+
+```{r}
+fibL["5", , ]
+```
+
+```{r}
+fibL["335", , ]
+```
+
+```{r}
+fibM <- with(
+  prt,
+  tapply(
+    spec.fo, list(id = id, fiberF = fiber.f, occF = occ.f),
+    mean
+  )
+)
+fibM
+```
+
+```{r}
+fibM["5", , ]
+```
+
+```{r}
+library(reshape)
+idvar <- c("id", "prt.f", "fiber.f", "occ.f")
+meas.var <- c("spec.fo", "iso.fo")
+prtM <- melt(prt, id.var = idvar, measure.var = meas.var)
+prtM
+```
+
+```{r}
+prtC <- cast(prtM, fun.aggregate = mean)
+names(prtC)[5:6] <- c("spec.foMn", "iso.foMn")
+prtC
+```
+
+## 3.4 SII Project: Gain in the Math Achievement Score
+
+```{r}
+data(SIIdata, package = "nlmeU")
+SIIdata
+```
+
+```{r}
+sapply(SIIdata, function(x) any(is.na(x)))
+```
+
+```{r}
+sum(as.numeric(is.na(SIIdata$mathknow)))
+```
+
+```{r}
+range(SIIdata$mathknow, na.rm = TRUE)
+```
+
+```{r}
+schlN <- xtabs(~schoolid, SIIdata)
+schlN
+```
+
+```{r}
+range(schlN)
+```
+
+```{r}
+xtabs(~schlN)
+```
+
+```{r}
+attach(SIIdata)
+mthgM <- by(cbind(mathgain, mathkind), schoolid, colMeans)
+mthgM
+detach(SIIdata)
+```
+
+```{r}
+library(reshape)
+idvars <- c("schoolid")
+mvars <- c("classid", "childid")
+dtm1 <- melt(SIIdata, id.vars = idvars, measure.vars = mvars)
+dtm1
+```
+
+```{r}
+cst1 <- cast(dtm1, fun.aggregate = function(el) length(unique(el)))
+names(cst1) <- c("schoolid", "clssn", "schlN")
+cst1
+```
+
+```{r}
+mvars <- c("mathgain", "mathkind", "housepov")
+dtm2 <- melt(SIIdata, id.vars = idvars, measure.vars = mvars)
+dtm2
+```
+
+```{r}
+cst2 <- cast(dtm2, fun.aggregate = mean)
+names(cst2) <- c("schoolid", "mthgMn", "mthkMn", "housepov")
+cst2
+```
+
+```{r}
+schlDt <- merge(cst1, cst2, sort = FALSE)
+schlDt
+```
+
+```{r}
+rm(cst1, cst2)
+```
+
+```{r}
+summary(schlDt$housepov)
+```
+
+```{r}
+library(lattice)
+xyplot(mthgMn ~ housepov, schlDt, type = c("p", "smooth"), grid = TRUE)
+```
+
+```{r}
+xyplot(mthgMn ~ mthkMn, schlDt, type = c("p", "smooth"), grid = TRUE)
+```
+
+```{r}
+clssN <- xtabs(~classid, SIIdata)
+clssN
+```
+
+```{r}
+sum(clssN)
+```
+
+```{r}
+range(clssN)
+```
+
+```{r}
+clssCnt <- xtabs(~clssN)
+clssCnt
+```
+
+```{r}
+sum(clssCnt)
+```
+
+```{r}
+idvars <- c("classid")
+mvars <- c("childid")
+dtm1 <- melt(SIIdata, id.vars = idvars, measure.vars = mvars)
+dtm1
+```
+
+```{r}
+cst1 <- cast(dtm1, fun.aggregate = function(el) length(unique(el)))
+names(cst1) <- c("classid", "childid")
+cst1
+```
+
+```{r}
+mvars <- c("mathgain", "mathkind", "housepov")
+dtm2 <- melt(SIIdata, id.vars = idvars, measure.vars = mvars)
+dtm2
+```
+
+```{r}
+cst2 <- cast(dtm2, fun.aggregate = mean)
+names(cst2) <- c("classid", "mthgMn", "mthkMn", "housepov")
+cst2
+```
+
+```{r}
+clssDt <- merge(cst1, cst2, sort = FALSE)
+clssDt
+```
+
+```{r}
+library(dplyr)
+clssDt <-
+  SIIdata %>% 
+  group_by(classid) %>% 
+  summarize(
+    housepov = unique(housepov),
+    mathknow = unique(mathknow),
+    mathprep = unique(mathprep),
+    clssN = length(unique(childid)),
+    mthgMn = mean(mathgain),
+    mthkMn = mean(mathkind)
+  )
+clssDt
+detach(package:dplyr)
+```
+
+```{r}
+auxDt <- merge(SIIdata, clssDt, sort = FALSE)
+auxDt2 <- within(auxDt, {
+  auxL <- paste(classid, schoolid, sep = "\n:")
+  auxL1 <- paste(auxL, clssN, sep = "\n(")
+  auxL2 <- paste(auxL1, ")", sep = "")
+  clssF <- factor(schoolid:classid, labels = unique(auxL2))
+})
+tmpDt <- subset(auxDt2, select = c(classid, schoolid, clssN, clssF))
+tmpDt
+```
+
+```{r}
+dotplot(mathgain ~ clssF, subset(auxDt2, schoolid %in% 1:4))
+```
+
+```{r}
+xyplot(mathgain ~ housepov, SIIdata, type = c("p", "smooth"))
+```
+
+## 3.5 FCAT Study: Target Score
+
+```{r}
+data(fcat, package = "nlmeU")
+scM <- with(fcat, tapply(scorec, list(id, target), mean))
+scM
+```
+
+```{r}
+histogram(~ scorec | target, data = fcat, breaks = NULL)
+```
