@@ -1,0 +1,322 @@
+---
+title: "note03"
+output: html_notebook
+---
+
+# 3 성과평가
+
+## 3.1 데이터 분할
+
+```{r}
+library(forecast)
+```
+
+```{r}
+Amtrak.data <- read.csv("data-raw/Amtrak data.csv")
+ridership.ts <- ts(Amtrak.data$Ridership, start = c(1991, 1), end = c(2004, 3), freq = 12)
+```
+
+```{r}
+plot(ridership.ts,
+  ylim = c(1300, 2600), ylab = "Ridership", xlab = "Time",
+  bty = "l", xaxt = "n", xlim = c(1991, 2006.25)
+)
+axis(1, at = seq(1991, 2006, 1), labels = format(seq(1991, 2006, 1), digits = 2))
+lines(c(2004.25 - 3, 2004.25 - 3), c(0, 3500))
+lines(c(2004.25, 2004.25), c(0, 3500))
+text(1996.25, 2500, "Training")
+text(2002.75, 2500, "Validation")
+text(2005.25, 2500, "Future")
+arrows(2004 - 3, 2450, 1991.25, 2450, code = 3, length = 0.1, lwd = 1, angle = 30)
+arrows(2004.5 - 3, 2450, 2004, 2450, code = 3, length = 0.1, lwd = 1, angle = 30)
+arrows(2004.5, 2450, 2006, 2450, code = 3, length = 0.1, lwd = 1, angle = 30)
+```
+
+```{r}
+stepsAhead <- 36
+nTrain <- length(ridership.ts) - stepsAhead
+train.ts <- window(ridership.ts, start = c(1991, 1), end = c(1991, nTrain))
+valid.ts <- window(ridership.ts,
+  start = c(1991, nTrain + 1),
+  end = c(1991, nTrain + stepsAhead)
+)
+ridership.lm <- tslm(train.ts ~ trend + I(trend^2))
+ridership.lm.pred <- forecast(ridership.lm, h = stepsAhead, level = 0)
+```
+
+```{r}
+plot(ridership.lm.pred,
+  ylim = c(1300, 2600), ylab = "Ridership", xlab = "Time",
+  bty = "l", xaxt = "n", xlim = c(1991, 2006.25)
+)
+axis(1, at = seq(1991, 2006, 1), labels = format(seq(1991, 2006, 1)))
+lines(ridership.lm$fitted, lwd = 2)
+lines(valid.ts)
+lines(c(2004.25 - 3, 2004.25 - 3), c(0, 3500))
+lines(c(2004.25, 2004.25), c(0, 3500))
+text(1996.25, 2500, "Training")
+text(2002.75, 2500, "Validation")
+text(2005.25, 2500, "Future")
+arrows(2004 - 3, 2450, 1991.25, 2450, code = 3, length = 0.1, lwd = 1, angle = 30)
+arrows(2004.5 - 3, 2450, 2004, 2450, code = 3, length = 0.1, lwd = 1, angle = 30)
+arrows(2004.5, 2450, 2006, 2450, code = 3, length = 0.1, lwd = 1, angle = 30)
+```
+
+## 3.2 단순 예측치(또는 단순 예측모형)
+
+## 3.3 예측정확도의 계산
+
+```{r}
+nValid <- 36
+nTrain <- length(ridership.ts) - nValid
+train.ts <- window(ridership.ts, start = c(1991, 1), end = c(1991, nTrain))
+valid.ts <- window(ridership.ts,
+  start = c(1991, nTrain + 1),
+  end = c(1991, nTrain + nValid)
+)
+ridership.lm <- tslm(train.ts ~ poly(trend, 2, raw = 2))
+ridership.lm.pred <- forecast(ridership.lm, h = nValid, level = 0)
+
+res <- round(valid.ts - ridership.lm.pred$mean, digits = 3)
+cbind(ridership.lm.pred$mean, valid.ts, res)
+```
+
+```{r}
+valid.ts <- window(ridership.ts,
+  start = c(1991, nTrain + 1),
+  end = c(1991, nTrain + nValid)
+)
+accuracy(ridership.lm.pred$mean, valid.ts)
+```
+
+## 3.4 예측 불확실성 평가
+
+```{r}
+stepsAhead <- 36
+nTrain <- length(ridership.ts) - stepsAhead
+train.ts <- window(ridership.ts, start = c(1991, 1), end = c(1991, nTrain))
+valid.ts <- window(ridership.ts,
+  start = c(1991, nTrain + 1),
+  end = c(1991, nTrain + stepsAhead)
+)
+ridership.lm <- tslm(train.ts ~ trend + I(trend^2))
+ridership.lm.pred <- forecast(ridership.lm, h = stepsAhead, level = 0)
+```
+
+```{r}
+plot(ridership.lm.pred$residuals,
+  ylim = c(-400, 500),
+  ylab = "Residuals", xlab = "Time",
+  bty = "l", xaxt = "n", xlim = c(1991, 2006.25)
+)
+axis(1, at = seq(1991, 2006, 1), labels = format(seq(1991, 2006, 1)))
+lines(valid.ts - ridership.lm.pred$mean, lwd = 1, col = "red")
+lines(c(2004.25 - 3, 2004.25 - 3), c(-500, 3500))
+lines(c(2004.25, 2004.25), c(-500, 3500))
+text(1996.25, 500, "Training")
+text(2002.75, 500, "Validation")
+text(2005.25, 500, "Future")
+arrows(2004 - 3, 450, 1991.25, 450, code = 3, length = 0.1, lwd = 1, angle = 30)
+arrows(2004.5 - 3, 450, 2004, 450, code = 3, length = 0.1, lwd = 1, angle = 30)
+arrows(2004.5, 450, 2006, 450, code = 3, length = 0.1, lwd = 1, angle = 30)
+```
+
+```{r}
+names(ridership.lm.pred)
+ridership.lm.pred$residuals
+```
+
+```{r}
+(valid.ts - ridership.lm.pred$mean)
+```
+
+```{r}
+hist(ridership.lm.pred$residuals,
+  ylab = "Frequency",
+  xlab = "Forecast Error", bty = "l", main = ""
+)
+```
+
+```{r}
+stepsAhead <- 36
+nTrain <- length(ridership.ts) - stepsAhead
+train.ts <- window(ridership.ts, start = c(1991, 1), end = c(1991, nTrain))
+valid.ts <- window(ridership.ts,
+  start = c(1991, nTrain + 1),
+  end = c(1991, nTrain + stepsAhead)
+)
+ridership.lm <- tslm(train.ts ~ trend + I(trend^2))
+ridership.lm.pred <- forecast(ridership.lm, h = stepsAhead, level = 95)
+```
+
+```{r}
+plot(ridership.lm.pred,
+  ylim = c(1300, 2600), ylab = "Ridership", xlab = "Time",
+  bty = "l", xaxt = "n", xlim = c(1991, 2006.25), flty = 2
+)
+axis(1, at = seq(1991, 2006, 1), labels = format(seq(1991, 2006, 1)))
+lines(ridership.lm$fitted, lwd = 2)
+lines(valid.ts)
+lines(c(2004.25 - 3, 2004.25 - 3), c(0, 3500))
+lines(c(2004.25, 2004.25), c(0, 3500))
+text(1996.25, 2500, "Training")
+text(2002.75, 2500, "Validation")
+text(2005.25, 2500, "Future")
+arrows(2004 - 3, 2450, 1991.25, 2450, code = 3, length = 0.1, lwd = 1, angle = 30)
+arrows(2004.5 - 3, 2450, 2004, 2450, code = 3, length = 0.1, lwd = 1, angle = 30)
+arrows(2004.5, 2450, 2006, 2450, code = 3, length = 0.1, lwd = 1, angle = 30)
+```
+
+```{r}
+tumblr.data <- read.csv("data-raw/Tumblr.csv")
+people.ts <- ts(tumblr.data$People.Worldwide) / 1000000
+
+# Run three exponential smoothing models: AAN, MMN, and MMdN.
+# MMN stands for Multiplicative error, Multiplicative trend, and No seasonality. MMdN stands for Multiplicative error, Multiplicative damped trend, and No seasonality.
+people.ets.AAN <- ets(people.ts, model = "AAN")
+people.ets.MMN <- ets(people.ts, model = "MMN", damped = FALSE)
+people.ets.MMdN <- ets(people.ts, model = "MMN", damped = TRUE)
+
+# Create their prediction "cones" for 115 months into the future (Jun 2013 to Dec 2022).
+people.ets.AAN.pred <- forecast(people.ets.AAN, h = 115, level = c(0.2, 0.4, 0.6, 0.8))
+people.ets.MMN.pred <- forecast(people.ets.MMN, h = 115, level = c(0.2, 0.4, 0.6, 0.8))
+people.ets.MMdN.pred <- forecast(people.ets.MMdN, h = 115, level = c(0.2, 0.4, 0.6, 0.8))
+```
+
+```{r}
+# Compare the three models' "forecast cones" visually.
+par(mfrow = c(1, 3)) # This command sets the plot window to show 1 row of 3 plots.
+plot(people.ets.AAN.pred, xlab = "Month", ylab = "People (in millions)", ylim = c(0, 1000))
+plot(people.ets.MMN.pred, xlab = "Month", ylab = "People (in millions)", ylim = c(0, 1000))
+plot(people.ets.MMdN.pred, xlab = "Month", ylab = "People (in millions)", ylim = c(0, 1000))
+```
+
+```{r}
+# Examine the lower and upper limits of the MMN model's prediction cones.
+head(people.ets.MMN.pred$lower)
+head(people.ets.MMN.pred$upper)
+```
+
+## 3.5 데이터 분할의 고급 기능: 롤 포워드(roll-forward) 분할방식에 의한 평가
+
+```{r}
+fixed.nValid <- 36
+fixed.nTrain <- length(ridership.ts) - fixed.nValid
+train.ts <- window(ridership.ts, start = c(1991, 1), end = c(1991, fixed.nTrain))
+valid.ts <- window(ridership.ts, start = c(1991, fixed.nTrain + 1), end = c(1991, fixed.nTrain + fixed.nValid))
+naive.fixed <- naive(train.ts, h = fixed.nValid)
+naive.roll <- ts(Amtrak.data$Ridership[fixed.nTrain:(fixed.nTrain + fixed.nValid - 1)], start = c(1991, fixed.nTrain + 1), end = c(1991, fixed.nTrain + fixed.nValid), freq = 12)
+
+# Figure 3-6 (한글판 3.7)
+plot(train.ts, ylim = c(1300, 2600), ylab = "Ridership", xlab = "Time", bty = "l", xaxt = "n", xlim = c(1991, 2006.25), main = "")
+axis(1, at = seq(1991, 2006, 1), labels = format(seq(1991, 2006, 1)))
+lines(naive.fixed$mean, lwd = 2, col = "blue", lty = 2)
+lines(naive.roll, lwd = 2, col = "blue", lty = 2)
+lines(valid.ts)
+lines(c(2004.25 - 3, 2004.25 - 3), c(0, 3500))
+lines(c(2004.25, 2004.25), c(0, 3500))
+text(1996.25, 2500, "Training")
+text(2002.75, 2500, "Validation")
+text(2005.25, 2500, "Future")
+arrows(2004 - 3, 2450, 1991.25, 2450, code = 3, length = 0.1, lwd = 1, angle = 30)
+arrows(2004.5 - 3, 2450, 2004, 2450, code = 3, length = 0.1, lwd = 1, angle = 30)
+arrows(2004.5, 2450, 2006, 2450, code = 3, length = 0.1, lwd = 1, angle = 30)
+```
+
+```{r}
+fixed.nValid <- 36
+fixed.nTrain <- length(ridership.ts) - fixed.nValid
+stepsAhead <- 1
+error <- rep(0, fixed.nValid - stepsAhead + 1)
+percent.error <- rep(0, fixed.nValid - stepsAhead + 1)
+for (j in fixed.nTrain:(fixed.nTrain + fixed.nValid - stepsAhead)) {
+  train.ts <- window(ridership.ts, start = c(1991, 1), end = c(1991, j))
+  valid.ts <- window(ridership.ts, start = c(1991, j + stepsAhead), end = c(1991, j + stepsAhead))
+  naive.pred <- naive(train.ts, h = stepsAhead)
+  error[j - fixed.nTrain + 1] <- valid.ts - naive.pred$mean[stepsAhead]
+  percent.error[j - fixed.nTrain + 1] <- error[j - fixed.nTrain + 1] / valid.ts
+}
+mean(abs(error))
+sqrt(mean(error^2))
+mean(abs(percent.error))
+```
+
+```{r}
+fixed.nValid <- 36
+fixed.nTrain <- length(ridership.ts) - fixed.nValid
+mae <- rep(0, fixed.nValid)
+rmse <- rep(0, fixed.nValid)
+mape <- rep(0, fixed.nValid)
+for (i in 1:36) {
+  stepsAhead <- i
+  error <- rep(0, fixed.nValid - stepsAhead + 1)
+  percent.error <- rep(0, fixed.nValid - stepsAhead + 1)
+  for (j in fixed.nTrain:(fixed.nTrain + fixed.nValid - stepsAhead)) {
+    train.ts <- window(ridership.ts, start = c(1991, 1), end = c(1991, j))
+    valid.ts <- window(ridership.ts, start = c(1991, j + stepsAhead), end = c(1991, j + stepsAhead))
+    naive.pred <- naive(train.ts, h = stepsAhead)
+    error[j - fixed.nTrain + 1] <- valid.ts - naive.pred$mean[stepsAhead]
+    percent.error[j - fixed.nTrain + 1] <- error[j - fixed.nTrain + 1] / valid.ts
+  }
+  mae[i] <- mean(abs(error))
+  rmse[i] <- sqrt(mean(error^2))
+  mape[i] <- mean(abs(percent.error))
+}
+mean(mae)
+mean(rmse)
+mean(mape)
+```
+
+```{r}
+fixed.nValid <- 36
+fixed.nTrain <- length(ridership.ts) - fixed.nValid
+train.ts <- window(ridership.ts, start = c(1991, 1), end = c(1991, fixed.nTrain))
+valid.ts <- window(ridership.ts, start = c(1991, fixed.nTrain + 1), end = c(1991, fixed.nTrain + fixed.nValid))
+naive.pred <- naive(train.ts, h = fixed.nValid)
+snaive.pred <- snaive(train.ts, h = fixed.nValid)
+accuracy(naive.pred, valid.ts)
+accuracy(snaive.pred, valid.ts)
+```
+
+```{r}
+data.frame(naive.pred$mean)
+data.frame(valid.ts)
+```
+
+```{r}
+valid.ts
+naive.pred
+snaive.pred
+```
+
+```{r}
+fixed.nValid <- 36
+fixed.nTrain <- length(ridership.ts) - fixed.nValid
+stepsAhead <- 1
+error.naive <- rep(0, fixed.nValid - stepsAhead + 1)
+percent.error.naive <- rep(0, fixed.nValid - stepsAhead + 1)
+error.snaive <- rep(0, fixed.nValid - stepsAhead + 1)
+percent.error.snaive <- rep(0, fixed.nValid - stepsAhead + 1)
+for (j in fixed.nTrain:(fixed.nTrain + fixed.nValid - stepsAhead)) {
+  train.ts <- window(ridership.ts, start = c(1991, 1), end = c(1991, j))
+  valid.ts <- window(ridership.ts, start = c(1991, j + stepsAhead), end = c(1991, j + stepsAhead))
+  naive.pred <- naive(train.ts, h = stepsAhead)
+  snaive.pred <- snaive(train.ts, h = stepsAhead)
+  error.naive[j - fixed.nTrain + 1] <- valid.ts - naive.pred$mean[stepsAhead]
+  percent.error.naive[j - fixed.nTrain + 1] <- error.naive[j - fixed.nTrain + 1] / valid.ts
+  error.snaive[j - fixed.nTrain + 1] <- valid.ts - snaive.pred$mean[stepsAhead]
+  percent.error.snaive[j - fixed.nTrain + 1] <- error.snaive[j - fixed.nTrain + 1] / valid.ts
+}
+```
+
+```{r}
+mean(abs(error.naive))
+sqrt(mean(error.naive^2))
+mean(abs(percent.error.naive))
+```
+
+```{r}
+mean(abs(error.snaive))
+sqrt(mean(error.snaive^2))
+mean(abs(percent.error.snaive))
+```
