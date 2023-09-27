@@ -1,0 +1,610 @@
+---
+title: "note19"
+output: html_notebook
+---
+
+# 19 Quasiquotation
+
+## 19.1 Introduction
+
+```{r}
+library(rlang)
+library(purrr)
+library(lobstr)
+```
+
+## 19.2 Motivation
+
+```{r}
+paste("Good", "morning", "Hadley")
+paste("Good", "afternoon", "Alice")
+```
+
+```{r}
+cement <- function(...) {
+  args <- ensyms(...)
+  paste(purrr::map(args, as_string), collapse = " ")
+}
+
+cement(Good, morning, Hadley)
+cement(Good, afternoon, Alice)
+```
+
+```{r}
+name <- "Hadley"
+time <- "morning"
+paste("Good", time, name)
+```
+
+```{r}
+cement(Good, time, name)
+```
+
+```{r}
+cement(Good, !!time, !!name)
+```
+
+```{r}
+library(MASS)
+try(MASS)
+```
+
+```{r}
+mtcars2 <- subset(
+  mtcars, # evaluated
+  cyl == 4 # quoted
+)
+
+with(
+  mtcars2, # evaluated
+  sum(vs) # quoted
+)
+
+sum(mtcars2$am)
+```
+
+```{r}
+rm(mtcars2) # mtcars2 -> quoted
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+by_cyl <- mtcars %>% # evaluated
+  group_by(cyl) %>% # quoted
+  summarize(mean = mean(mpg)) # quoted
+```
+
+```{r}
+dplyr::summarize
+```
+
+```{r}
+dplyr:::summarise.data.frame
+```
+
+```{r}
+dplyr:::summarise_cols
+```
+
+## 19.3 Quoting
+
+```{r}
+expr(x + y)
+expr(1 / 2 / 3)
+```
+
+```{r}
+f1 <- function(x) expr(x)
+f1(a + b + c)
+```
+
+```{r}
+f2 <- function(x) enexpr(x)
+f2(a + b + c)
+```
+
+```{r}
+f <- function(...) enexprs(...)
+f(x = 1, y = 10 * z)
+```
+
+```{r}
+exprs(x = x^2, y = y^3, z = z^4)
+```
+
+```{r}
+f <- function(...) ensyms(...)
+f(x)
+```
+
+```{r}
+quote(x + y)
+```
+
+```{r}
+f3 <- function(x) substitute(x)
+f3(x + y)
+```
+
+```{r}
+alist(x = 1, y = x + 2)
+```
+
+```{r}
+f <- function(...) as.list(substitute(...()))
+f(x = 1, y = 10 * z)
+```
+
+```{r}
+f4 <- function(x) substitute(x * 2)
+f4(a + b + c)
+```
+
+```{r}
+substitute(x * y * z, list(x = 10, y = quote(a + b)))
+```
+
+```{r}
+f1 <- function(x, y) {
+  exprs(x = x, y = y)
+}
+f2 <- function(x, y) {
+  enexprs(x = x, y = y)
+}
+f1(a + b, c + d)
+f2(a + b, c + d)
+```
+
+```{r}
+out1 <- exprs(a)
+str(out1)
+```
+
+```{r}
+out2 <- exprs(a = )
+str(out2)
+```
+
+```{r}
+my_env <- env()
+substitute(x, my_env)
+```
+
+```{r}
+foo <- function(x) substitute(x)
+foo(x + y * sin(0))
+```
+
+```{r}
+my_env$x <- 7
+substitute(x, my_env)
+```
+
+```{r}
+x <- 7
+substitute(x, .GlobalEnv)
+```
+
+## 19.4 Unquoting
+
+```{r}
+x <- expr(-1)
+expr(f(!!x, y))
+```
+
+```{r}
+a <- sym("y")
+b <- 1
+expr(f(!!a, !!b))
+```
+
+```{r}
+mean_rm <- function(var) {
+  var <- ensym(var)
+  expr(mean(!!var, na.rm = TRUE))
+}
+expr(!!mean_rm(x) + !!mean_rm(y))
+```
+
+```{r}
+f <- expr(foo)
+expr((!!f)(x, y))
+```
+
+```{r}
+f <- expr(pkg::foo)
+expr((!!f)(x, y))
+call2(f, expr(x), expr(y))
+```
+
+```{r}
+arg <- missing_arg()
+try(expr(foo(!!arg, !!arg)))
+```
+
+```{r}
+expr(foo(!!maybe_missing(arg), !!maybe_missing(arg)))
+```
+
+```{r}
+x <- expr(x)
+expr(`$`(df, !!x))
+```
+
+```{r}
+xs <- exprs(1, a, -b)
+expr(f(!!!xs, y))
+```
+
+```{r}
+ys <- set_names(xs, c("a", "b", "c"))
+expr(f(!!!ys, d = 4))
+```
+
+```{r}
+call2("f", !!!xs, expr(y))
+```
+
+```{r}
+!!TRUE
+!!!TRUE
+```
+
+```{r}
+df <- data.frame(x = 1:5)
+y <- 100
+with(df, x + !!y)
+```
+
+```{r}
+x1 <- expr(class(!!data.frame(x = 10)))
+x1
+eval(x1)
+```
+
+```{r}
+expr_print(x1)
+ast(!!x1)
+```
+
+```{r}
+x2 <- expr(f(!!c(1L, 2L, 3L, 4L, 5L)))
+x2
+expr_print(x2)
+ast(!!x2)
+```
+
+```{r}
+x3 <- expr(1 + !!expr(2 + 3))
+x3
+ast(!!x3)
+```
+
+```{r}
+xy <- expr(x + y)
+xz <- expr(x + z)
+yz <- expr(y + z)
+abc <- exprs(a, b, c)
+```
+
+```{r}
+expr(!!xy / !!yz) # (1)
+expr(-(!!xz)^(!!yz)) # (2)
+expr(((!!xy)) + !!yz - !!xy) # (3)
+expr(atan2(!!xy, !!yz)) # (4)
+expr(sum(!!xy, !!xy, !!yz)) # (5)
+expr(sum(!!!abc)) # (6)
+expr(mean(c(!!!abc), na.rm = TRUE)) # (7)
+expr(foo(a = !!xy, b = !!yz)) # (8)
+```
+
+```{r}
+ast(mean(1:10))
+```
+
+```{r}
+ast(mean(!!(1:10)))
+```
+
+## 19.5 Non-quoting
+
+```{r}
+xyz <- bquote((x + y + z))
+bquote(-.(xyz) / 2)
+```
+
+```{r}
+x <- list(var = 1, y = 2)
+var <- "y"
+x$var
+x[[var]]
+```
+
+```{r}
+x <- 1
+rm(x)
+
+y <- 2
+vars <- c("y", "vars")
+rm(list = vars)
+```
+
+```{r}
+library(MASS)
+pkg <- "MASS"
+library(pkg, character.only = TRUE)
+```
+
+```{r}
+help(var)
+var <- "mean"
+help(var)
+var <- 10
+help(var)
+```
+
+```{r}
+palette(RColorBrewer::brewer.pal(3, "Set1"))
+plot(
+  Sepal.Length ~ Petal.Length,
+  data = iris,
+  col = Species,
+  pch = 20,
+  cex = 2
+)
+```
+
+## 19.6 ... (dot-dot-dot)
+
+```{r}
+dfs <- list(
+  a = data.frame(x = 1, y = 2),
+  b = data.frame(x = 3, y = 4)
+)
+```
+
+```{r}
+var <- "x"
+val <- c(4, 3, 9)
+```
+
+```{r}
+dplyr::bind_rows(!!!dfs)
+```
+
+```{r}
+tibble::tibble(!!var := val)
+```
+
+```{r}
+set_attr <- function(.x, ...) {
+  attr <- rlang::list2(...)
+  attributes(.x) <- attr
+  .x
+}
+attrs <- list(x = 1, y = 2)
+attr_names <- "z"
+1:10 %>%
+  set_attr(w = 0, !!!attrs, !!attr_names := 3) %>%
+  str()
+```
+
+```{r}
+exec("mean", x = 1:10, na.rm = TRUE, trim = 0.1)
+```
+
+```{r}
+args <- list(x = 1:10, na.rm = TRUE, trim = 0.1)
+exec("mean", !!!args)
+```
+
+```{r}
+params <- list(na.rm = TRUE, trim = 0.1)
+exec("mean", x = 1:10, !!!params)
+```
+
+```{r}
+arg_name <- "na.rm"
+arg_val <- TRUE
+exec("mean", 1:10, !!arg_name := arg_val)
+```
+
+```{r}
+x <- c(runif(10), NA)
+funs <- c("mean", "median", "sd")
+
+purrr::map_dbl(funs, exec, x, na.rm = TRUE)
+```
+
+```{r}
+tibble::tibble(
+  x = 5:1,
+  y = 1:5,
+  z = 3:-1,
+)
+```
+
+```{r}
+str(dots_list(x = 1, x = 2))
+```
+
+```{r}
+str(dots_list(x = 1, x = 2, .homonyms = "first"))
+```
+
+```{r}
+str(dots_list(x = 1, x = 2, .homonyms = "last"))
+```
+
+```{r}
+try(str(dots_list(x = 1, x = 2, .homonyms = "error")))
+```
+
+```{r}
+do.call("rbind", dfs)
+```
+
+```{r}
+args <- list(val)
+names(args) <- var
+args
+
+do.call("data.frame", args)
+```
+
+```{r}
+f <- function(..., .dots) {
+  dots <- c(list(...), .dots)
+  dots
+}
+f(x = 1, y = 2, z = 3, .dots = c(a = 1, b = 2))
+```
+
+```{r}
+interaction(a = c("a", "b", "c", "d"), b = c("e", "f"))
+```
+
+## 19.7 Case studies
+
+```{r}
+z <- expr(foo(x, y))
+ast(z)
+ast(!!z)
+```
+
+```{r}
+intercept <- 10
+coefs <- c(x1 = 5, x2 = -4)
+coef_sym <- syms(names(coefs))
+summands <- map2(coef_sym, coefs, ~ expr(!!.x * !!.y))
+summands
+summands <- c(intercept, summands)
+eq <- reduce(summands, ~ expr(!!.x + !!.y))
+eq
+```
+
+```{r}
+linear <- function(var, val) {
+  var <- ensym(var)
+  coef_name <- map(seq_along(val[-1]), ~ expr((!!var)[[!!.x]]))
+
+  summands <- map2(val[-1], coef_name, ~ expr((!!.x * !!.y)))
+  summands <- c(val[[1]], summands)
+
+  reduce(summands, ~ expr(!!.x + !!.y))
+}
+
+linear(x, c(10, 5, -4))
+```
+
+```{r}
+indices <- rep(list(missing_arg()), 3)
+expr(x[!!!indices])
+```
+
+```{r}
+indices[[2]] <- 1
+expr(x[!!!indices])
+```
+
+```{r}
+slice <- function(x, along, index) {
+  stopifnot(length(along) == 1)
+  stopifnot(length(index) == 1)
+
+  nd <- length(dim(x))
+  indices <- rep(list(missing_arg()), nd)
+  indices[[along]] <- index
+
+  expr(x[!!!indices])
+}
+
+x <- array(sample(30), c(5, 2, 3))
+x
+```
+
+```{r}
+slice(x, 1, 3)
+slice(x, 2, 2)
+slice(x, 3, 1)
+```
+
+```{r}
+new_function(
+  exprs(x = , y = ),
+  expr({
+    x + y
+  })
+)
+```
+
+```{r}
+power <- function(exponent) {
+  new_function(
+    exprs(x = ),
+    expr({
+      x^!!exponent
+    }),
+    caller_env()
+  )
+}
+
+power(0.5)
+```
+
+```{r}
+curve(sin(exp(4 * x)), n = 1000)
+```
+
+```{r}
+curve2 <- function(expr, xlim = c(0, 1), n = 100) {
+  expr <- enexpr(expr)
+  f <- new_function(exprs(x = ), expr)
+  x <- seq(xlim[1], xlim[2], length = n)
+  y <- f(x)
+
+  plot(x, y, type = "l", ylab = expr_text(expr))
+}
+curve2(sin(exp(4 * x)), n = 1000)
+```
+
+```{r}
+bc <- function(lambda) {
+  if (lambda == 0) {
+    function(x) log(x)
+  } else {
+    function(x) (x^lambda - 1) / lambda
+  }
+}
+
+bc2 <- function(lambda) {
+  lambda <- enexpr(lambda)
+
+  if (!!lambda == 0) {
+    new_function(exprs(x = ), expr(log(x)))
+  } else {
+    new_function(exprs(x = ), expr((x^(!!lambda) - 1) / !!lambda))
+  }
+}
+bc2(0)
+bc2(2)
+bc2(2)(2)
+```
+
+```{r}
+compose <- function(f, g) {
+  function(...) f(g(...))
+}
+
+compose2 <- function(f, g) {
+  f <- enexpr(f)
+  g <- enexpr(g)
+  new_function(exprs(... = ), expr((!!f)((!!g)(...))))
+}
+compose(sin, cos)
+compose2(sin, cos)
+compose2(sin, cos)(pi)
+```
+
+## 19.8 History

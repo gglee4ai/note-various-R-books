@@ -1,0 +1,809 @@
+---
+title: "note13"
+output: html_notebook
+---
+
+# 13 S3
+
+## 13.1 Introduction
+
+```{r}
+library(sloop)
+```
+
+## 13.2 Basics
+
+```{r}
+f <- factor(c("a", "b", "c"))
+typeof(f)
+```
+
+```{r}
+attributes(f)
+```
+
+```{r}
+unclass(f)
+```
+
+```{r}
+ftype(print)
+ftype(str)
+ftype(unclass)
+```
+
+```{r}
+print(f)
+```
+
+```{r}
+print(unclass(f))
+```
+
+```{r}
+time <- strptime(c("2017-01-01", "2020-05-04 03:21"), "%Y-%m-%d")
+str(time)
+```
+
+```{r}
+str(unclass(time))
+```
+
+```{r}
+s3_dispatch(print(f))
+```
+
+```{r}
+ftype(t.test)
+ftype(t.data.frame)
+```
+
+```{r}
+try(weighted.mean.Date)
+```
+
+```{r}
+s3_get_method(weighted.mean.Date)
+```
+
+```{r}
+some_days <- as.Date("2017-01-31") + sample(10, 5)
+some_days
+mean(some_days)
+mean(unclass(some_days))
+```
+
+```{r}
+x <- ecdf(rpois(100, 10))
+x
+```
+
+```{r}
+class(x)
+```
+
+```{r}
+typeof(x)
+attributes(x)
+```
+
+```{r}
+x <- table(rpois(100, 5))
+x
+typeof(x)
+```
+
+```{r}
+attributes(x)
+```
+
+## 13.3 Classes
+
+```{r}
+x <- structure(list(), class = "my_class")
+
+x <- list()
+class(x) <- "my_class"
+```
+
+```{r}
+class(x)
+inherits(x, "my_class")
+inherits(x, "your_class")
+```
+
+```{r}
+mod <- lm(log(mpg) ~ log(disp), data = mtcars)
+class(mod)
+print(mod)
+```
+
+```{r}
+class(mod) <- "Date"
+try(print(mod))
+```
+
+```{r}
+new_Date <- function(x = double()) {
+  stopifnot(is.double(x))
+  structure(x, class = "Date")
+}
+new_Date(c(-1, 0, 1))
+```
+
+```{r}
+new_difftime <- function(x = double(), units = "secs") {
+  stopifnot(is.double(x))
+  units <- match.arg(units, c("secs", "mins", "hours", "days", "weeks"))
+
+  structure(
+    x,
+    class = "difftime",
+    units = units
+  )
+}
+
+new_difftime(c(1, 10, 3600), "secs")
+new_difftime(52, "weeks")
+```
+
+```{r}
+new_factor <- function(x = integer(), levels = character()) {
+  stopifnot(is.integer(x))
+  stopifnot(is.character(levels))
+
+  structure(
+    x,
+    levels = levels,
+    class = "factor"
+  )
+}
+new_factor(c(1L, 2L), c("a", "b"))
+# new_factor(0:1, "a")
+```
+
+```{r}
+validate_factor <- function(x) {
+  values <- unclass(x)
+  levels <- attr(x, "levels")
+
+  if (!all(!is.na(values) & values > 0)) {
+    stop(
+      "All `x` values must be non-missing and greater than zero",
+      call. = FALSE
+    )
+  }
+  if (length(levels) < max(values)) {
+    stop(
+      "There must be at least as many `levels` as possible values in `x`",
+      call. = FALSE
+    )
+  }
+  x
+}
+
+try(validate_factor(new_factor(1:5, "a")))
+try(validate_factor(new_factor(0:1, "a")))
+```
+
+```{r}
+try(new_difftime(1:10))
+```
+
+```{r}
+difftime <- function(x = double(), units = "secs") {
+  x <- as.double(x)
+  new_difftime(x, units = units)
+}
+difftime(1:10)
+```
+
+```{r}
+myfactor <- function(x = character(), levels = unique(x)) {
+  ind <- match(x, levels)
+  validate_factor(new_factor(ind, levels))
+}
+myfactor(c("a", "a", "b"))
+```
+
+```{r}
+POSIXct <- function(year = integer(),
+                    month = integer(),
+                    day = integer(),
+                    hour = 0L,
+                    minute = 0L,
+                    sec = 0,
+                    tzone = "") {
+  ISOdatetime(year, month, day, hour, minute, sec, tz = tzone)
+}
+
+POSIXct(2020, 1, 1, tzone = "America/New_York")
+#> [1] "2020-01-01 EST"
+```
+
+```{r}
+new_data.frame <- function(x, n, row.names = NULL) {
+  stopifnot(is.list(x))
+  stopifnot(all(lengths(x) == n))
+  if (is.null(row.names)) {
+    row.names <- .set_row_names(n)
+  } else {
+    stopifnot(is.character(row.names), length(row.names) == n)
+  }
+
+  structure(
+    x,
+    class = "data.frame",
+    row.names = row.names
+  )
+}
+```
+
+```{r}
+x <- list(a = 1, b = 2)
+new_data.frame(x, n = 1)
+```
+
+```{r}
+new_data.frame(x, n = 1, row.names = "l1")
+```
+
+```{r}
+new_data.frame(list(), n = 2)
+```
+
+```{r}
+factor(c("a", "b", "c"), levels = c("a", "b"))
+```
+
+```{r}
+factor2 <- function(x, levels = unique(x)) {
+  new_levels <- match(x, levels)
+
+  missing <- unique(setdiff(x, levels))
+  if (length(missing) > 0) {
+    stop(
+      "The folling values do not occur in the levels of x: ",
+      paste0("'", missing, "'", collapse = ", "), ".",
+      call. = FALSE
+    )
+  }
+  validate_factor(new_falctor(new_levels, levels))
+}
+
+try(factor2(c("a", "b", "c"), levels = c("a", "b")))
+```
+
+```{r}
+new_factor <- function(x = integer(),
+                       levels = character(),
+                       contrasts = NULL) {
+  stopifnot(is.integer(x))
+  stopifnot(is.character(levels))
+
+  if (!is.null(contrasts)) {
+    stopifnot(is.matrix(contrasts) && is.numeric(contrasts))
+  }
+
+  structure(
+    x,
+    levels = levels,
+    class = "factor",
+    contrasts = contrasts
+  )
+}
+```
+
+```{r}
+new_roman <- function(x = integer()) {
+  stopifnot(is.integer(x))
+  structure(x, class = "roman")
+}
+validate_roman <- function(x) {
+  values <- unclass(x)
+
+  if (any(values < 1 | values > 3899)) {
+    stop(
+      "Roman numbers must fall between 1 and 3899.",
+      calls. = FALSE
+    )
+  }
+  x
+}
+try(validate_roman(new_roman(-1L)))
+```
+
+```{r}
+roman <- function(x = integer()) {
+  x <- as.integer(x)
+  validate_roman(new_roman(x))
+}
+roman(c(1, 753, 2019))
+try(roman(0))
+```
+
+## 13.4 Generics and methods
+
+```{r}
+mean
+```
+
+```{r}
+my_new_generic <- function(x) {
+  UseMethod("my_new_generic")
+}
+a <- structure("adfsdf", class = "myclass")
+a
+```
+
+```{r}
+my_new_generic.myclass <- function(x) {
+  cat("myclass:", x)
+}
+my_new_generic(a)
+```
+
+```{r}
+x <- Sys.Date()
+s3_dispatch(print(x))
+```
+
+```{r}
+x <- matrix(1:10, nrow = 2)
+s3_dispatch(mean(x))
+```
+
+```{r}
+s3_dispatch(sum(Sys.time()))
+```
+
+```{r}
+s3_methods_generic("mean")
+```
+
+```{r}
+s3_methods_class("ordered")
+```
+
+```{r}
+m <- lm(mpg ~ disp, data = mtcars)
+s3_methods_generic("print")
+```
+
+```{r}
+class(m)
+s3_methods_class("lm") |>
+  dplyr::filter(visible == TRUE)
+```
+
+```{r}
+s3_methods_generic("summary")
+```
+
+```{r}
+x <- structure(1:10, class = "test")
+t(x)
+```
+
+```{r}
+tools::nonS3methods("stats")
+```
+
+```{r}
+s3_methods_class("table")
+```
+
+```{r}
+plot(table(rpois(100, 10)))
+```
+
+```{r}
+s3_methods_class("ecdf")
+```
+
+```{r}
+s3_methods_generic("print")
+```
+
+```{r}
+library(purrr)
+
+ls(all.names = TRUE, env = baseenv()) %>%
+  mget(envir = baseenv()) %>%
+  keep(is_function) %>%
+  names() %>%
+  keep(is_s3_generic) %>%
+  map(~ set_names(nrow(s3_methods_generic(.x)), .x)) %>%
+  flatten_int() %>%
+  sort(decreasing = TRUE) %>%
+  head()
+```
+
+```{r}
+g <- function(x) {
+  x <- 10
+  y <- 10
+  UseMethod("g")
+}
+g.default <- function(x) c(x = x, y = y)
+
+x <- 1
+y <- 1
+g(x)
+```
+
+```{r}
+g.default(x)
+```
+
+```{r}
+g(x)
+```
+
+```{r}
+ftype(`[`)
+```
+
+```{r}
+names(formals(`[.data.frame`))
+names(formals(`[.table`))
+names(formals(`[.Date`))
+names(formals(`[.AsIs`))
+```
+
+```{r}
+library(dplyr)
+
+s3_methods_generic("[") %>%
+  filter(visible) %>%
+  mutate(
+    method = paste0("[.", class),
+    argnames = purrr::map(method, ~ names(formals(.x))),
+    args = purrr::map(method, ~ formals(.x)),
+    args = purrr::map2(
+      argnames, args,
+      ~ paste(.x, .y, sep = " = ")
+    ),
+    args = purrr::set_names(args, method)
+  ) %>%
+  pull(args) %>%
+  head()
+```
+
+## 13.5 Object styles
+
+```{r}
+x <- as.POSIXlt(ISOdatetime(2020, 1, 1, 0, 0, 1:3))
+x
+```
+
+```{r}
+length(x)
+x[[1]]
+```
+
+```{r}
+length(unclass(x))
+unclass(x)[[1]]
+```
+
+```{r}
+x <- data.frame(x = 1:100, y = 1:100)
+length(x)
+nrow(x)
+```
+
+```{r}
+mod <- lm(cyl ~ ., data = mtcars)
+typeof(mod)
+```
+
+```{r}
+attributes(mod)
+```
+
+```{r}
+map_chr(mod, typeof)
+```
+
+## 13.6 Inheritance
+
+```{r}
+class(ordered("x"))
+class(Sys.time())
+```
+
+```{r}
+s3_dispatch(print(ordered("x")))
+```
+
+```{r}
+s3_dispatch(print(Sys.time()))
+```
+
+```{r}
+s3_dispatch(ordered("x")[1])
+```
+
+```{r}
+s3_dispatch(Sys.time()[1])
+```
+
+```{r}
+new_secret <- function(x = double()) {
+  stopifnot(is.double(x))
+  structure(x, class = "secret")
+}
+
+print.secret <- function(x, ...) {
+  print(strrep("x", nchar(x)))
+  invisible(x)
+}
+
+x <- new_secret(c(15, 1, 456))
+x
+```
+
+```{r}
+s3_dispatch(x[1])
+```
+
+```{r}
+x[1]
+```
+
+```{r}
+`[.secret` <- function(x, i) {
+  x <- unclass(x)
+  new_secret(x[i])
+}
+x[1]
+```
+
+```{r}
+`[.secret` <- function(x, i) {
+  new_secret(NextMethod())
+}
+x[1]
+```
+
+```{r}
+s3_dispatch(x[1])
+```
+
+```{r}
+new_secret <- function(x, ..., class = character()) {
+  stopifnot(is.double(x))
+
+  structure(
+    x,
+    ...,
+    class = c(class, "secret")
+  )
+}
+
+new_supersecret <- function(x) {
+  new_secret(x, class = "supersecret")
+}
+
+print.supersecret <- function(x, ...) {
+  print(rep("xxxxx", length(x)))
+  invisible(x)
+}
+
+x2 <- new_supersecret(c(15, 1, 456))
+x2
+```
+
+```{r}
+`[.secret` <- function(x, ...) {
+  new_secret(NextMethod())
+}
+x2[1:3]
+```
+
+```{r}
+vec_restore.secret <- function(x, to, ...) new_secret(x)
+vec_restore.supersecret <- function(x, to, ...) new_supersecret(x)
+```
+
+```{r}
+`[.secret` <- function(x, ...) {
+  vctrs::vec_restore(NextMethod(), x)
+}
+x2[1:3]
+```
+
+```{r}
+`[.Date`
+```
+
+```{r}
+.Date
+```
+
+```{r}
+`[.Date` <- function(x, ..., drop = TRUE) {
+  out <- NextMethod("[")
+  class(out) <- class(x)
+  out
+}
+```
+
+```{r}
+x <- structure(1:4, test = "test", class = c("myDate", "Date"))
+attributes(x)
+```
+
+```{r}
+attributes(x[1])
+```
+
+```{r}
+generics_t <- s3_methods_class("POSIXt")$generic
+generics_ct <- s3_methods_class("POSIXct")$generic
+generics_lt <- s3_methods_class("POSIXlt")$generic
+```
+
+```{r}
+union(generics_ct, generics_lt)
+```
+
+```{r}
+setdiff(generics_t, union(generics_ct, generics_lt))
+```
+
+```{r}
+generic2 <- function(x) UseMethod("generic2")
+generic2.a1 <- function(x) "a1"
+generic2.a2 <- function(x) "a2"
+generic2.b <- function(x) {
+  class(x) <- "a1"
+  NextMethod()
+}
+
+generic2(structure(list(), class = c("b", "a2")))
+```
+
+```{r}
+try(generic2(structure(list(), class = c("b"))))
+```
+
+```{r}
+generic2.b <- function(x) {
+  class(x) <- "a1"
+  print(.Class)
+  NextMethod()
+}
+
+generic2(structure(list(), class = c("b", "a2")))
+```
+
+## 13.7 Dispatch details
+
+```{r}
+class(matrix(1:5))
+```
+
+```{r}
+s3_class(matrix(1:5))
+```
+
+```{r}
+s3_dispatch(print(matrix(1:5)))
+```
+
+```{r}
+x1 <- 1:5
+class(x1)
+s3_dispatch(mean(x1))
+```
+
+```{r}
+x2 <- structure(x1, class = "integer")
+class(x2)
+s3_dispatch(mean(x2))
+```
+
+```{r}
+s3_dispatch(Sys.time()[1])
+```
+
+```{r}
+s3_dispatch(sum(Sys.time()))
+```
+
+```{r}
+y <- as.difftime(10, units = "mins")
+s3_dispatch(abs(y))
+```
+
+```{r}
+date <- as.Date("2017-01-01")
+integer <- 1L
+
+date + integer
+integer + date
+```
+
+```{r}
+length.integer <- function(x) 10
+
+x1 <- 1:5
+class(x1)
+s3_dispatch(length(x1))
+```
+
+```{r}
+x2 <- structure(x1, class = "integer")
+class(x2)
+s3_dispatch(length(x2))
+```
+
+```{r}
+attr(x1, "class")
+```
+
+```{r}
+attr(x2, "class")
+```
+
+```{r}
+s3_class(x1)
+```
+
+```{r}
+s3_class(x2)
+```
+
+```{r}
+s3_methods_generic("Math")
+```
+
+```{r}
+Math.data.frame <- function(x) "hello"
+```
+
+```{r}
+abs(mtcars)
+exp(mtcars)
+lgamma(mtcars)
+```
+
+```{r}
+Math.data.frame <- function(x, ...) {
+  .Generic
+}
+```
+
+```{r}
+abs(mtcars)
+exp(mtcars)
+lgamma(mtcars)
+```
+
+```{r}
+rm(Math.data.frame)
+```
+
+```{r}
+# Advanced R
+
+Math.difftime <- function(x, ...) {
+  new_difftime(NextMethod(), units = attr(x, "units"))
+}
+rm(Math.difftime)
+```
+
+```{r}
+Math.difftime
+```
+
+```{r}
+nt <- difftime(10)
+nt
+```
+
+```{r}
+try(exp(nt))
+```

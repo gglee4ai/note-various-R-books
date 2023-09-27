@@ -1,0 +1,136 @@
+---
+title: "note23"
+output: html_notebook
+---
+
+```{r}
+options(paged.print = FALSE)
+```
+
+# 23 Measuring performance
+
+## 23.1 Introduction
+
+```{r}
+library(profvis)
+library(bench)
+```
+
+## 23.2 Profiling
+
+```{r}
+f <- function() {
+  pause(0.1)
+  g()
+  h()
+}
+g <- function() {
+  pause(0.1)
+  h()
+}
+h <- function() {
+  pause(0.1)
+}
+```
+
+```{r}
+tmp <- tempfile()
+Rprof(tmp, interval = 0.1)
+f()
+Rprof(NULL)
+writeLines(readLines(tmp))
+```
+
+```{r}
+source("R/profile-example.R")
+profvis(f())
+```
+
+```{r}
+profvis({
+  x <- integer()
+  for (i in 1:1e4) {
+    x <- c(x, i)
+  }
+})
+```
+
+```{r}
+profvis({
+  i <- function() {
+    pause(0.1)
+    10
+  }
+  j <- function(x) {
+    x + 10
+  }
+  j(i())
+})
+```
+
+```{r}
+f <- function(n = 1e5) {
+  x <- rep(1, n)
+  rm(list = "x")
+}
+# profvis::profvis(f(), torture = TRUE)
+```
+
+## 23.3 Microbenchmarking
+
+```{r}
+x <- runif(100)
+((lb <- bench::mark(
+  sqrt(x),
+  x^0.5
+)))
+```
+
+```{r}
+plot(lb)
+```
+
+```{r}
+lb[c("expression", "min", "median", "itr/sec", "n_gc")]
+```
+
+```{r}
+n <- 1e6
+```
+
+```{r}
+bench_df <- bench::mark(
+  sqrt(x),
+  x^0.5,
+  iterations = n
+)
+bench_df
+```
+
+```{r}
+t1_bench <- mean(unlist(bench_df[1, "time"]))
+t2_bench <- mean(unlist(bench_df[2, "time"]))
+t1_bench
+t2_bench
+```
+
+```{r}
+t1_systime <- system.time(for (i in 1:n) sqrt(x)) / n
+t2_systime <- system.time(for (i in 1:n) x^0.5) / n
+t1_systime["elapsed"]
+t2_systime["elapsed"]
+```
+
+```{r}
+lb2 <- bench::mark(
+  sqrt(x),
+  x^0.5,
+  x^(1 / 2),
+  exp(log(x) / 2)
+)
+lb2
+```
+
+```{r}
+plot(lb2)
+```
