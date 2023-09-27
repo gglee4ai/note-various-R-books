@@ -1,0 +1,255 @@
+---
+title: "Chapter 7"
+output: html_notebook
+---
+
+# 7 효율적인 최적화
+
+```{r}
+library(efficient)
+library(profvis)
+```
+
+# 7.1 효율적인 성능을 위한 상위 5가지 팁
+
+1.  코드 최적화를 시작하기 전에 병목 현상이 어디에 있는지 확인하십시오. 코드 프로파일러를 사용합니다.
+2.  데이터 프레임의 데이터가 모두 동일한 유형인 경우 속도 향상을 위해 이를 행렬로 변환하는 것이 좋습니다.
+3.  가능할 때마다 특수 행 및 열 함수를 사용하십시오.
+4.  병렬 패키지 는 Monte-Carlo 시뮬레이션에 이상적입니다.
+5.  최적의 성능을 위해서는 코드의 핵심 부분을 C++로 다시 작성하는 것이 좋습니다.
+
+### 7.2.1 profvis 시작하기
+
+```{r}
+library(profvis)
+profvis({
+  data(movies, package = "ggplot2movies")
+  movies <- movies[movies$Comedy == 1, ]
+  plot(movies$year, movies$rating)
+  model <- loess(rating ~ year, data = movies)
+  j <- order(movies$year)
+  lines(movies$year[j], model$fitted[j], col = "red")
+})
+```
+
+### 7.2.2 예: 독점 시뮬레이션
+
+```{r}
+# Original function
+library(profvis)
+profvis(
+  {
+    for (i in 1:10000) {
+      current <- 0
+      df <- data.frame(
+        d1 = sample(1:6, 3, replace = TRUE),
+        d2 = sample(1:6, 3, replace = TRUE)
+      )
+
+      df$Total <- apply(df, 1, sum)
+      df$IsDouble <- df$d1 == df$d2
+
+      if (df$IsDouble[1] & df$IsDouble[2] & df$IsDouble[3]) {
+        current <- 11 # Go To Jail
+      } else if (df$IsDouble[1] & df$IsDouble[2]) {
+        current <- current + sum(df$Total[1:3])
+      } else if (df$IsDouble[1]) {
+        current <- current + sum(df$Total[1:2])
+      } else {
+        current <- current + df$Total[1]
+      }
+    }
+  },
+  interval = 0.005
+)
+```
+
+```{r}
+## With improvements
+profvis(
+  {
+    for (i in 1:10000) {
+      current <- 0
+      dd <- matrix(sample(1:6, 6, replace = TRUE), ncol = 2)
+      Total <- rowSums(dd)
+      IsDouble <- dd[, 1] == dd[, 2]
+      if (IsDouble[1] && IsDouble[2] && IsDouble[3]) {
+        current <- 11 # Go To Jail
+      } else if (IsDouble[1] && IsDouble[2]) {
+        current <- current + sum(Total[1:3])
+      } else if (IsDouble[1]) {
+        current <- current + Total[1:2]
+      } else {
+        current <- Total[1]
+      }
+      current
+    }
+  },
+  interval = 0.005
+)
+```
+
+```{r}
+## Abandoning the vectorised approach
+profvis(
+  {
+    for (i in 1:10000) {
+      die1 <- sample(1:6, 2, replace = TRUE)
+      current <- sum(die1)
+      if (die1[1] == die1[2]) {
+        die2 <- sample(1:6, 2, replace = TRUE)
+        current <- current + sum(die2)
+        if (die2[1] == die2[2]) {
+          die3 <- sample(1:6, 2, replace = TRUE)
+          if (die3[1] == die3[2]) {
+            current <- 11
+          } else {
+            current <- current + sum(die3)
+          }
+        }
+      }
+    }
+  },
+  interval = 0.005
+)
+```
+
+## 7.3 효율적인 base R
+
+```{r}
+marks <- runif(n = 10e6, min = 30, max = 99)
+system.time({
+  result1 <- ifelse(marks >= 40, "pass", "fail")
+})
+system.time({
+  result2 <- rep("fail", length(marks))
+  result2[marks >= 40] <- "pass"
+})
+system.time({
+  result3 <- dplyr::if_else(marks >= 40, "pass", "fail")
+})
+identical(result1, result2)
+identical(result1, result3)
+```
+
+**인수를 숫자로 변환**
+
+```{r}
+f <- factor(sample(c("a", "b", "c"), size = 100000, replace = TRUE))
+as.numeric(f)
+```
+
+**행렬**
+
+```{r}
+data(ex_mat, ex_df, package = "efficient")
+microbenchmark::microbenchmark(
+  times = 100, unit = "ms",
+  ex_mat[1, ], # matrix index 호출
+  ex_df[1, ], # data.frame index 호출
+  ex_df$c1 # data.frame 직접 호출
+)
+```
+
+```{r}
+x <- runif(10)
+microbenchmark::microbenchmark(head(x, 6.0), head(x, 6L), times = 1000000)
+```
+
+```{r}
+pryr::object_size(1:10000)
+pryr::object_size(seq(1, 10000, by = 1.0))
+```
+
+```{r}
+is.integer(1L + 1)
+```
+
+**희소행렬**
+
+```{r}
+library(Matrix)
+N <- 10000
+sp <- sparseMatrix(1:N, 1:N, x = 1)
+m <- diag(1, N, N)
+
+pryr::object_size(sp)
+pryr::object_size(m)
+```
+
+## 7.5 병렬 컴퓨팅
+
+```{r}
+library(parallel)
+no_of_cores <- detectCores(logical = FALSE)
+no_of_cores
+```
+
+### 7.5.2 예: 뱀과 사다리
+
+```{r}
+n <- 5e6
+monte_carlo <- function(N) {
+  hits <- 0
+  for (i in seq_len(N)) {
+    u1 <- runif(1)
+    u2 <- runif(1)
+    if (u1^2 > u2) {
+      hits <- hits + 1
+    }
+  }
+  return(hits / N)
+}
+```
+
+```{r}
+system.time(sapply(rep(5e5, 50), monte_carlo))
+```
+
+```{r}
+cores <- detectCores(logical = FALSE)
+cl <- makeCluster(cores)
+system.time(parSapply(cl, rep(5e5, 50), monte_carlo))
+stopCluster(cl)
+```
+
+### 7.5.3 주의해서 기능 종료
+
+```{r}
+simuate <- function(cores) {
+  cl <- makeCluster(cores)
+  on.exit(stopCluster(cl))
+  parSapply(cl, rep(5e5, 50), monte_carlo)
+}
+system.time(simuate(8))
+```
+
+mclapply는 윈도우에서는 동작하지 않지만, 위의 과정이 필요없음
+
+```{r}
+system.time(mclapply(rep(5e5, 50), monte_carlo, mc.cores = 8))
+```
+
+## Rcpp
+
+### 7.6.1 간단한 C++ 함수
+
+```{r}
+efficient::test_rcpp()
+```
+
+### 7.6.2 cppFunction() 명령
+
+```{r}
+library(Rcpp)
+cppFunction("
+double add_cpp(double x, double y) {
+  double value = x + y;
+  return value;
+}
+")
+```
+
+```{r}
+add_cpp(1, 2)
+```

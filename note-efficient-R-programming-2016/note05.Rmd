@@ -1,0 +1,114 @@
+---
+title: "Chapter 5"
+output: html_notebook
+---
+
+# 5 효율적인 입출력
+
+## 5.2 rio로 다양한 데이터 가져오기
+
+```{r}
+library("rio")
+# Specify a file
+fname = system.file("extdata/voc_voyages.tsv", package = "efficient")
+# Import the file (uses the fread function from data.table)
+voyages = import(fname)
+# Export the file as an Excel spreadsheet
+export(voyages, "voc_voyages.xlsx")
+file.remove("voc_voyages.xlsx")
+```
+
+```{r}
+capitals = import("https://github.com/mledoze/countries/raw/master/countries.json")
+capitals
+```
+
+## 5.3 일반 텍스트 형식
+
+### 5.3.1fread() 와 의 차이점read_csv()
+
+```{r}
+fname = system.file("extdata/voc_voyages.tsv", package = "efficient")
+voyages_base = read.delim(fname)
+voyages_base
+```
+
+```{r}
+voyages_readr = readr::read_tsv(fname)
+```
+
+```{r}
+readr::problems()
+```
+
+```{r}
+voyages_dt = data.table::fread(fname)
+voyages_dt
+```
+
+```{r}
+microbenchmark::microbenchmark(times = 5,
+  with_select = data.table::fread(fname, select = 1:11),
+  without_select = data.table::fread(fname)
+)
+```
+
+## 5.4 바이너리 파일 형식
+
+### 5.4.1 기본 바이너리 형식: Rdata 또는 Rds?
+
+**결론**: rds를 사용하시오.
+
+```{r}
+save(voyages, file = "save-test.RData")
+saveRDS(voyages, "save-test.rds")
+load("save-test.RData")
+voyages2 <- readRDS("save-test.rds")
+identical(voyages, voyages2)
+file.remove("save-test.Rdata")
+file.remove("save-test.rds")
+```
+
+### 5.4.2 페더 파일 형식
+
+Feather는 데이터 프레임을 저장하기 위한 빠르고 가볍고 언어에 구애받지 않는 형식을 만들기 위해 R과 Python 개발자 간의 협력으로 개발되었습니다. 아래 코드 청크는 df_co2R과 Python 모두에서 이전에 로드된 데이터 세트를 저장한 다음 다시 로드하는 데 사용할 수 있는 방법을 보여줍니다.
+
+```{r}
+library(feather)
+write_feather(voyages, "save-test.feather")
+df_feather = read_feather("save-test.feather")
+dplyr::all_equal(voyages, df_feather)
+file.remove("save-test.feather")
+```
+
+NOTE: 완전한 동일체를 생성하지 않는 것으로 보아, 뭔가 알수 없는 변환이 조금 들어가는 듯
+
+## 5.5 인터넷에서 데이터 가져오기
+
+```{r}
+url = "https://raw.githubusercontent.com/gglee4ai/data/main/insurance.zip"
+filename <- "test.zip"
+download.file(url, filename) # download file
+unzip(filename, exdir = "extdata") # unzip files
+file.remove(filename) # tidy up by removing the zip file
+```
+
+```{r}
+url = "https://vincentarelbundock.github.io/Rdatasets/csv/datasets/co2.csv"
+download.file(url, "extdata/co2.csv")
+df_co2 = readr::read_csv("extdata/co2.csv")
+```
+
+```{r}
+# install.packages("WDI")
+library("WDI")
+head(WDIsearch("CO2")) # search for data on a topic
+co2_transport = WDI(indicator = "EN.CO2.TRAN.ZS") # import data
+head(co2_transport)
+```
+
+## 5.6 패키지에 저장된 데이터 접근
+
+```{r}
+list.files(system.file("extdata", package = "readr"))
+```

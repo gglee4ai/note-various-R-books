@@ -1,0 +1,102 @@
+---
+title: "Chapter 2"
+output: html_notebook
+---
+
+# 2 효율적인 설정
+
+```{r}
+library("benchmarkme")
+```
+
+## 2.2 운영체제
+
+```{r}
+Sys.info()
+```
+
+### 2.2.1 운영 체제 및 리소스 모니터링
+
+```{r}
+X <- as.data.frame(matrix(rnorm(1e8), nrow = 1e7))
+X
+```
+
+```{r}
+system.time(r1 <- lapply(X, median))
+```
+
+```{r}
+system.time(r1 <- parallel::mclapply(X, median))
+```
+
+## 2.4 R 시작
+
+### 2.4.2 R의 시작 파일 개요
+
+R이 시작될 때마다 두 개의 파일을 읽습니다(위에 설명된 명령줄 옵션 중 하나가 사용되지 않는 한):
+
+-   .Renviron: 주요 목적은 환경 변수 를 설정하는 것 입니다. 이것은 R에게 외부 프로그램을 찾을 위치를 알려주고 일반적으로 API 키 와 같이 비밀로 유지해야 하는 것보다 사용자별 정보를 보유할 수 있습니다 .
+-   .Rprofile: RprofileR이 시작될 때마다 단순히 R 코드 라인을 실행 하는 일반 텍스트 파일(항상 호출 되므로 이름이 지정됨)입니다. R이 시작할 때마다 패키지 업데이트를 확인하도록 하려면(이전 섹션에서 설명한 대로) 이 파일의 어딘가에 관련 줄을 추가하기만 하면 됩니다.
+
+R이 시작되면(로 시작되지 않은 경우 --no-environ) 먼저 검색 .Renviron한 다음 .Rprofile, 순서대로 검색합니다. 가 먼저 검색 되지만 더 간단하고 많은 설정 작업에 더 자주 유용하기 때문에 먼저 .Renviron살펴보겠습니다 . .Rprofile두 파일 모두 컴퓨터의 세 디렉터리에 있을 수 있습니다.
+
+### 2.4.3 시작 파일의 위치
+
+```{r}
+R.home()
+Sys.getenv("HOME")
+getwd()
+```
+
+```{r}
+# file.edit("~/.Rprofile") # edit .Rprofile in HOME
+# file.edit(".Rprofile") # edit project specific .Rprofile
+```
+
+### 2.4.4.Rprofile 파일 \_
+
+```{r}
+site_path <- R.home(component = "home")
+fname <- file.path(site_path, "etc", "Rprofile.site")
+file.exists(fname)
+```
+
+### 2.4.6.Renviron 파일
+
+```{r}
+Sys.getenv("R_LIBS_USER")
+```
+
+```{r}
+Sys.setenv("TEST" = "test-string")
+Sys.getenv("TEST")
+Sys.unsetenv("TEST")
+Sys.getenv("TEST")
+```
+
+## 2.5 RStudio
+
+### 2.5.2 창틀 레이아웃
+
+```{r}
+download.file(
+  "https://support.staffbase.com/hc/en-us/article_attachments/360009197031/username.csv",
+  "extdata/pop_change.csv"
+)
+pop_change <- read.table("extdata/pop_change.csv", sep = ";", header = TRUE)
+pop_change
+```
+
+## 2.6 BLAS 및 대체 R 인터프리터
+
+```{r}
+library("benchmarkme")
+get_linear_algebra()
+```
+
+### 2.6.1 BLAS의 성능 향상 테스트
+
+```{r}
+res <- benchmark_std()
+```
