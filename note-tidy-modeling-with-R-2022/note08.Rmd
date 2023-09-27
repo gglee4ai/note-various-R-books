@@ -1,0 +1,245 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# 8 레시피를 사용한 기능 엔지니어링
+
+## 8.1 recipe() AMES 주택 데이터에 대한 단순
+
+```{r}
+library(tidymodels)
+data(ames)
+
+ames <- mutate(ames, Sale_Price = log10(Sale_Price))
+
+set.seed(502)
+ames_split <- initial_split(ames, prop = 0.80, strata = Sale_Price)
+ames_train <- training(ames_split)
+ames_test <- testing(ames_split)
+
+lm_model <- linear_reg() %>% set_engine("lm")
+
+lm_wflow <-
+  workflow() %>%
+  add_model(lm_model) %>%
+  add_variables(outcome = Sale_Price, predictors = c(Longitude, Latitude))
+
+lm_fit <- fit(lm_wflow, ames_train)
+```
+
+```{r}
+tidymodels_prefer()
+```
+
+```{r}
+simple_ames <-
+  recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type,
+    data = ames_train
+  ) %>%
+  step_log(Gr_Liv_Area, base = 10) %>%
+  step_dummy(all_nominal_predictors())
+simple_ames
+```
+
+## 8.2 레시피 사용하기
+
+```{r}
+lm_wflow <-
+  lm_wflow %>%
+  remove_variables() %>%
+  add_recipe(simple_ames)
+lm_wflow
+```
+
+```{r}
+lm_fit <- fit(lm_wflow, ames_train)
+```
+
+```{r}
+predict(lm_fit, ames_test %>% slice(1:3))
+```
+
+```{r}
+lm_fit %>%
+  extract_recipe(estimated = TRUE)
+```
+
+```{r}
+lm_fit %>%
+  extract_fit_parsnip() %>%
+  tidy() %>%
+  slice(1:5)
+```
+
+## 8.3 데이터 사용 방법recipe()
+
+## 8.4 레시피 단계의 예
+
+```{r}
+simple_ames <-
+  recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type,
+    data = ames_train
+  ) %>%
+  step_log(Gr_Liv_Area, base = 10) %>%
+  step_other(Neightborhood, threshold = 0.01) %>%
+  step_dummy(all_nominal_predictors())
+simple_ames
+```
+
+```{r}
+ggplot(ames_train, aes(Gr_Liv_Area, 10^Sale_Price)) +
+  geom_point(alpha = .2) +
+  facet_wrap(~Bldg_Type) +
+  geom_smooth(method = lm, formula = y ~ x, se = FALSE, color = "lightblue") +
+  scale_x_log10() +
+  scale_y_log10() +
+  labs(x = "Gross Living Area", y = "Sale Price (USD") +
+  theme_bw()
+```
+
+```{r}
+simple_ames <-
+  recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type,
+    data = ames_train
+  ) %>%
+  step_log(Gr_Liv_Area, base = 10) %>%
+  step_other(Neighborhood, threshold = 0.01) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_interact(~ Gr_Liv_Area:starts_with("Bldg_Type_"))
+```
+
+```{r}
+library(patchwork)
+library(splines)
+
+plot_smoother <- function(deg_free) {
+  ggplot(ames_train, aes(Latitude, 10^Sale_Price)) +
+    geom_point(alpha = .2) +
+    scale_y_log10() +
+    geom_smooth(
+      method = lm,
+      formula = y ~ ns(x, df = deg_free),
+      color = "lightblue",
+      se = FALSE
+    ) +
+    labs(
+      title = paste(deg_free, "Spline Terms"),
+      y = "Sale Price (USD)"
+    )
+}
+(plot_smoother(2) + plot_smoother(5)) / (plot_smoother(20) + plot_smoother(100))
+```
+
+```{r}
+recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type + Latitude,
+  data = ames_train
+) %>%
+  step_log(Gr_Liv_Area, base = 10) %>%
+  step_other(Neighborhood, threshold = 0.01) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_interact(~ Gr_Liv_Area:starts_with("Bldg_Type_")) # %>%
+# step_ns(Latitude, deg_free = 20) %>%
+# step_pca(matches("(SF$)|(Gr_Liv)"))
+```
+
+## 8.5 새 데이터에 대한 단계 건너뛰기
+
+## 8.6 정리recipe()
+
+```{r}
+ames_rec <-
+  recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type + Latitude,
+    data = ames_train
+  ) %>%
+  step_log(Gr_Liv_Area, base = 10) %>%
+  step_other(Neighborhood, threshold = 0.01) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_interact(~ Gr_Liv_Area:starts_with("Bldg_Type_"))
+```
+
+```{r}
+tidy(ames_rec)
+```
+
+```{r}
+ames_rec <-
+  recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type +
+    Latitude + Longitude, data = ames_train) %>%
+  step_log(Gr_Liv_Area, base = 10) %>%
+  step_other(Neighborhood, threshold = 0.01, id = "my_id") %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_interact(~ Gr_Liv_Area:starts_with("Bldg_Type_")) %>%
+  step_ns(Latitude, Longitude, deg_free = 20)
+
+tidy(ames_rec)
+```
+
+```{r}
+lm_wflow <-
+  workflow() %>%
+  add_model(lm_model) %>%
+  add_recipe(ames_rec)
+
+lm_fit <- fit(lm_wflow, ames_train)
+```
+
+```{r}
+estimated_recipe <-
+  lm_fit %>%
+  extract_recipe(estimated = TRUE)
+tidy(estimated_recipe, id = "my_id")
+```
+
+```{r}
+tidy(estimated_recipe, number = 2)
+```
+
+```{r}
+unique(ames_train$Neighborhood) %>%
+  as.character() %>%
+  sort() -> a
+```
+
+```{r}
+tidy(estimated_recipe, number = 2) %>%
+  pull(retained) %>%
+  sort() -> b
+```
+
+```{r}
+setdiff(a, b)
+```
+
+## 8.7 열 역할
+
+## 8.8 요약
+
+```{r}
+library(tidymodels)
+data(ames)
+ames <- mutate(ames, Sale_Price = log10(Sale_Price))
+
+set.seed(502)
+ames_split <- initial_split(ames, prop = 0.80, strata = Sale_Price)
+ames_train <- training(ames_split)
+ames_test <- testing(ames_split)
+
+ames_rec <-
+  recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type +
+    Latitude + Longitude, data = ames_train) %>%
+  step_log(Gr_Liv_Area, base = 10) %>%
+  step_other(Neighborhood, threshold = 0.01) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_interact(~ Gr_Liv_Area:starts_with("Bldg_Type_")) %>%
+  step_ns(Latitude, Longitude, deg_free = 20)
+
+lm_model <- linear_reg() %>% set_engine("lm")
+
+lm_wflow <-
+  workflow() %>%
+  add_model(lm_model) %>%
+  add_recipe(ames_rec)
+
+lm_fit <- fit(lm_wflow, ames_train)
+```

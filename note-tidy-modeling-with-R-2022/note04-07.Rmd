@@ -1,0 +1,344 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# 4 The Ames 주택 데이터
+
+```{r}
+library(modeldata)
+data(ames)
+```
+
+```{r}
+data(ames, package = "modeldata")
+dim(ames)
+```
+
+## 4.1 AMES에 있는 주택의 특징 탐색
+
+```{r}
+library(tidymodels)
+tidymodels_prefer()
+```
+
+```{r}
+ames %>%
+  ggplot(aes(Sale_Price)) +
+  geom_histogram(bins = 50, col = "white")
+```
+
+```{r}
+ames %>%
+  ggplot(aes(Sale_Price)) +
+  geom_histogram(bind = 50, col = "white") +
+  scale_x_log10()
+```
+
+```{r}
+ames <-
+  ames %>%
+  mutate(Sale_Price = log10(Sale_Price))
+```
+
+# 5 데이터 사용
+
+## 5.1 데이터 분할을 위한 일반적인 방법
+
+```{r}
+library(tidymodels)
+tidymodels_prefer()
+```
+
+```{r}
+set.seed(501)
+ames_split <- initial_split(ames, prop = 0.80)
+ames_split
+```
+
+```{r}
+ames_train <- training(ames_split)
+ames_test <- testing(ames_split)
+dim(ames_train)
+```
+
+```{r}
+set.seed(502)
+ames_split <- initial_split(ames, prop = 0.80, strata = Sale_Price)
+ames_train <- training(ames_split)
+ames_test <- testing(ames_split)
+
+dim(ames_train)
+```
+
+# 6 파스닙이 있는 6 가지 피팅 모델
+
+## 6.1 모델 생성
+
+```{r}
+linear_reg() %>%
+  set_engine("lm") %>%
+  translate()
+```
+
+```{r}
+linear_reg(penalty = 1) %>%
+  set_engine("glmnet") %>%
+  translate()
+```
+
+```{r}
+linear_reg() %>%
+  set_engine("stan") %>%
+  translate()
+```
+
+```{r}
+lm_model <-
+  linear_reg() %>%
+  set_engine("lm")
+
+lm_form_fit <-
+  lm_model %>%
+  fit(Sale_Price ~ Longitude + Latitude, data = ames_train)
+lm_form_fit
+```
+
+```{r}
+lm_xy_fit <-
+  lm_model %>%
+  fit_xy(
+    x = ames_train %>% select(Longitude, Latitude),
+    y = ames_train %>% pull(Sale_Price)
+  )
+lm_xy_fit
+```
+
+```{r}
+rand_forest(trees = 1000, min_n = 5) %>%
+  set_engine("ranger") %>%
+  set_mode("regression") %>%
+  translate()
+```
+
+```{r}
+rand_forest(trees = 1000, min_n = 5) %>%
+  set_engine("ranger", verbose = TRUE) %>%
+  set_mode("regression")
+```
+
+## 6.2 모델 결과 사용
+
+```{r}
+lm_form_fit %>% extract_fit_engine()
+```
+
+```{r}
+lm_form_fit %>%
+  extract_fit_engine() %>%
+  vcov()
+```
+
+```{r}
+model_res <-
+  lm_form_fit %>%
+  extract_fit_engine() %>%
+  summary()
+model_res
+```
+
+```{r}
+param_est <- coef(model_res)
+class(param_est)
+param_est
+```
+
+```{r}
+tidy(lm_form_fit)
+```
+
+## 6.3 예측하기
+
+```{r}
+ames_test_small <- ames_test %>% slice(1:5)
+predict(lm_form_fit, new_data = ames_test_small)
+```
+
+```{r}
+ames_test_small %>%
+  select(Sale_Price) %>%
+  bind_cols(predict(lm_form_fit, ames_test_small)) %>%
+  bind_cols(predict(lm_form_fit, ames_test_small, type = "pred_int"))
+```
+
+```{r}
+tree_model <-
+  decision_tree(min_n = 2) %>%
+  set_engine("rpart") %>%
+  set_mode("regression")
+
+tree_fit <-
+  tree_model %>%
+  fit(Sale_Price ~ Longitude + Latitude, data = ames_train)
+
+ames_test_small %>%
+  select(Sale_Price) %>%
+  bind_cols(predict(tree_fit, ames_test_small))
+```
+
+# 7 모델 워크플로
+
+## 7.1 모델의 시작과 끝은 어디입니까?
+
+## 7.2 워크플로 기본
+
+```{r}
+lm_wflow <-
+  workflow() %>%
+  add_model(lm_model)
+
+lm_wflow
+```
+
+```{r}
+lm_wflow <-
+  lm_wflow %>%
+  add_formula(Sale_Price ~ Longitude + Latitude)
+lm_wflow
+```
+
+```{r}
+lm_fit <- fit(lm_wflow, ames_train)
+lm_fit
+```
+
+```{r}
+predict(lm_fit, ames_test %>% slice(1:3))
+```
+
+```{r}
+lm_fit %>% update_formula(Sale_Price ~ Longitude)
+```
+
+```{r}
+lm_wflow <-
+  lm_wflow %>%
+  remove_formula() %>%
+  add_variables(outcome = Sale_Price, predictors = c(Longitude, Latitude))
+lm_wflow
+```
+
+```{r}
+fit(lm_wflow, data = ames_train)
+```
+
+## 7.4 workflow() 공식 은 어떻게 사용합니까 ?
+
+```{r}
+library(lme4)
+data(Orthodont, package = "nlme")
+lmer(distance ~ Sex + (age | Subject), data = Orthodont)
+```
+
+```{r}
+try(model.matrix(distance ~ Sex + (age | Subject), data = Orthodont))
+```
+
+```{r}
+# install.packages("multilevelmod")
+library(multilevelmod)
+
+multilevel_spec <- linear_reg() %>% set_engine("lmer")
+
+multilevel_workflow <-
+  workflow() %>%
+  add_variables(outcome = distance, predictors = c(Sex, age, Subject)) %>%
+  add_model(multilevel_spec,
+    formula = distance ~ Sex + (age | Subject)
+  )
+
+multilevel_fit <- fit(multilevel_workflow, data = Orthodont)
+multilevel_fit
+```
+
+```{r}
+# install.packages("censored")
+library(censored)
+
+parametric_spec <- survival_reg()
+
+parametric_workflow <-
+  workflow() %>%
+  add_variables(outcome = c(fustat, futime), predictors = c(age, rx)) %>%
+  add_model(parametric_spec,
+    formula = Surv(futime, fustat) ~ age + strata(rx)
+  )
+
+parametric_fit <- fit(parametric_workflow, data = ovarian)
+parametric_fit
+```
+
+## 7.5 한 번에 여러 워크플로 만들기
+
+```{r}
+location <- list(
+  longitude = Sale_Price ~ Longitude,
+  latitude = Sale_Price ~ Latitude,
+  coords = Sale_Price ~ Longitude + Latitude,
+  neighborhood = Sale_Price ~ Neighborhood
+)
+```
+
+```{r}
+library(workflowsets)
+location_models <- workflow_set(preproc = location, models = list(lm = lm_model))
+location_models
+```
+
+```{r}
+location_models$info[[1]]
+```
+
+```{r}
+extract_workflow(location_models, id = "coords_lm")
+```
+
+```{r}
+location_models <-
+  location_models %>%
+  mutate(fit = map(info, ~ fit(.x$workflow[[1]], ames_train)))
+location_models
+```
+
+```{r}
+location_models$fit[[1]]
+```
+
+```{r}
+final_lm_res <- last_fit(lm_wflow, ames_split)
+final_lm_res
+```
+
+```{r}
+fitted_lm_wflow <- extract_workflow(final_lm_res)
+```
+
+```{r}
+collect_metrics(final_lm_res)
+```
+
+```{r}
+collect_predictions(final_lm_res)
+```
+
+```{r}
+predict(fitted_lm_wflow, new_data = ames_test) %>%
+  bind_cols(ames_test %>% select(Sale_Price)) %>%
+  rmse(.pred, Sale_Price)
+```
+
+```{r}
+predict(fitted_lm_wflow, new_data = ames_test) %>%
+  bind_cols(ames_test %>% select(Sale_Price)) %>%
+  rsq(.pred, Sale_Price)
+```

@@ -1,0 +1,157 @@
+---
+title: "note17"
+output: html_notebook
+---
+
+```{r}
+options(paged.print = FALSE)
+```
+
+# 17 범주형 데이터 인코딩
+
+## 17.1 인코딩이 필요한가요?
+
+## 17.2 순서 예측자 인코딩
+
+## 17.3 예측 변수를 인코딩하기 위한 결과 사용
+
+```{r}
+source("ames_snippets.R")
+library(embed)
+
+ames_glm <-
+  recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type +
+    Latitude + Longitude, data = ames_train) %>%
+  step_log(Gr_Liv_Area, base = 10) %>%
+  step_lencode_glm(Neighborhood, outcome = vars(Sale_Price)) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_interact(~ Gr_Liv_Area:starts_with("Bldg_Type_")) %>%
+  step_ns(Latitude, Longitude, deg_free = 20)
+
+ames_glm
+```
+
+```{r}
+glm_estimates <-
+  prep(ames_glm) %>%
+  tidy(number = 2)
+
+glm_estimates
+#> # A tibble: 29 × 4
+#>   level              value terms        id
+#>   <chr>              <dbl> <chr>        <chr>
+#> 1 North_Ames          5.15 Neighborhood lencode_glm_ZsXdy
+#> 2 College_Creek       5.29 Neighborhood lencode_glm_ZsXdy
+#> 3 Old_Town            5.07 Neighborhood lencode_glm_ZsXdy
+#> 4 Edwards             5.09 Neighborhood lencode_glm_ZsXdy
+#> 5 Somerset            5.35 Neighborhood lencode_glm_ZsXdy
+#> 6 Northridge_Heights  5.49 Neighborhood lencode_glm_ZsXdy
+#> # … with 23 more rows
+```
+
+```{r}
+glm_estimates %>%
+  filter(level == "..new")
+#> # A tibble: 1 × 4
+#>   level value terms        id
+#>   <chr> <dbl> <chr>        <chr>
+#> 1 ..new  5.23 Neighborhood lencode_glm_ZsXdy
+```
+
+```{r}
+ames_mixed <-
+  recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type +
+    Latitude + Longitude, data = ames_train) %>%
+  step_log(Gr_Liv_Area, base = 10) %>%
+  step_lencode_mixed(Neighborhood, outcome = vars(Sale_Price)) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_interact(~ Gr_Liv_Area:starts_with("Bldg_Type_")) %>%
+  step_ns(Latitude, Longitude, deg_free = 20)
+
+ames_mixed
+```
+
+```{r}
+mixed_estimates <-
+  prep(ames_mixed) %>%
+  tidy(number = 2)
+
+mixed_estimates
+```
+
+```{r}
+mixed_estimates %>%
+  filter(level == "..new")
+```
+
+```{r}
+glm_estimates %>%
+  rename(`no pooling` = value) %>%
+  left_join(
+    mixed_estimates %>%
+      rename(`partial pooling` = value),
+    by = "level"
+  ) %>%
+  left_join(
+    ames_train %>%
+      count(Neighborhood) %>%
+      mutate(level = as.character(Neighborhood))
+  ) %>%
+  ggplot(aes(`no pooling`, `partial pooling`, size = sqrt(n))) +
+  geom_abline(color = "gray50", lty = 2) +
+  geom_point(alpha = 0.7) +
+  coord_fixed()
+#> Warning: Removed 1 rows containing missing values (geom_point).
+```
+
+## 17.4 기능 해싱
+
+```{r}
+library(rlang)
+
+ames_hashed <-
+  ames_train %>%
+  mutate(Hash = map_chr(Neighborhood, hash))
+
+ames_hashed %>%
+  select(Neighborhood, Hash)
+```
+
+```{r}
+ames_hashed %>%
+  ## first make a smaller hash for integers that R can handle
+  mutate(
+    Hash = strtoi(substr(Hash, 26, 32), base = 16L),
+    ## now take the modulo
+    Hash = Hash %% 16
+  ) %>%
+  select(Neighborhood, Hash)
+```
+
+```{r}
+# install.packages("textrecipes")
+library(textrecipes)
+ames_hash <-
+  recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type +
+    Latitude + Longitude, data = ames_train) %>%
+  step_log(Gr_Liv_Area, base = 10) %>%
+  step_dummy_hash(Neighborhood, signed = FALSE, num_terms = 16L) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_interact(~ Gr_Liv_Area:starts_with("Bldg_Type_")) %>%
+  step_ns(Latitude, Longitude, deg_free = 20)
+
+ames_hash
+```
+
+```{r}
+hash_table <-
+  prep(ames_hash) %>%
+  bake(new_data = NULL, starts_with("dummyhash_Neighborhood_")) %>%
+  bind_cols(ames_train %>% select(Neighborhood)) %>%
+  distinct() %>%
+  select(-Neighborhood) %>%
+  map_dbl(sum) %>%
+  enframe() %>%
+  count(value)
+hash_table
+```

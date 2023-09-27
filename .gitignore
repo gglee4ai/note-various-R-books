@@ -1,7 +1,7 @@
 # My gitignore
 note-applied-longitudinal-data-analysis-2003/fits/fit*.rds
 *_temp
-*.RData
+# *.RData
 *.nb.html
 **/.DS_Store
 .DS_Store
