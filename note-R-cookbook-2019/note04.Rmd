@@ -1,0 +1,439 @@
+---
+title: "note04"
+output: html_notebook
+---
+
+# 4 입력 및 출력
+
+## 4.1 키보드에서 데이터 입력
+
+```{r}
+scores <- c(61, 66, 90, 88, 100)
+points <- data.frame(
+  label = c("Low", "Mid", "High"),
+  lbound = c(0, 0.67, 1.64),
+  ubound = c(0.67, 1.64, 2.33)
+)
+```
+
+## 4.2 더 적은 자릿수(또는 더 많은 자릿수) 인쇄
+
+```{r}
+print(pi, digits = 4)
+print(100 * pi, digits = 4)
+```
+
+```{r}
+cat(pi, "\n")
+cat(format(pi, digits = 4), "\n")
+```
+
+```{r}
+print(pnorm(-3:3), digits = 2)
+format(pnorm(-3:3), digits = 2)
+```
+
+```{r}
+q <- seq(from = 0, to = 3, by = 0.5)
+tbl <- data.frame(Quant = q, Lower = pnorm(-q), Upper = pnorm(q))
+tbl
+```
+
+```{r, paged.print=FALSE}
+print(tbl, digits = 2)
+```
+
+## 4.3 출력을 파일로 리디렉션
+
+```{r}
+answer <- 100
+cat("The answer is", answer, "\n", file = "write-file.txt")
+```
+
+```{r}
+cat(answer, file = "write-file.txt", append = TRUE)
+```
+
+```{r}
+con <- file("write-file.txt", "w")
+cat("This is Spartan!", file = con)
+close(con)
+```
+
+```{r}
+file.remove("write-file.txt")
+```
+
+## 4.4 파일 나열
+
+```{r}
+list.files()
+```
+
+```{r}
+list.files(path = getwd(), pattern = "[.]Rmd")
+list.files(path = getwd(), pattern = "\\.R$")
+```
+
+```{r}
+list.files(recursive = TRUE)
+```
+
+```{r}
+list.files(all.files = TRUE)
+```
+
+## 4.5 Windows에서 "파일을 열 수 없음" 처리
+
+## 4.6 고정 너비 레코드 읽기
+
+```{r}
+# library(tidyverse)
+# records <- read_fwf("myfile.txt",
+#                     fwf_cols(col1 = 10,
+#                              col2 = 7))
+# records
+```
+
+```{r}
+# file <- "./data/datafile.fwf"
+# t1 <- read_fwf(file, fwf_empty(file, col_names = c("last", "first", "birth", "death")))
+```
+
+```{r}
+# t2 <- read_fwf(file, fwf_widths(c(10, 10, 5, 4),
+#                                 c("last", "first", "birth", "death")))
+```
+
+```{r}
+# t3 <-
+#   read_fwf("./data/datafile.fwf",
+#            fwf_cols(
+#              last = 10,
+#              first = 10,
+#              birth = 5,
+#              death = 5
+#            ))
+```
+
+```{r}
+# t4 <- read_fwf(file, fwf_cols(
+#   last = c(1, 10),
+#   first = c(11, 20),
+#   birth = c(21, 25),
+#   death = c(26, 30)
+# ))
+```
+
+```{r}
+# t5 <- read_fwf(file, fwf_positions(
+#   c(1, 11, 21, 26),
+#   c(10, 20, 25, 30),
+#   c("first", "last", "birth", "death")
+# ))
+```
+
+## 4.7 테이블 형식 데이터 파일 읽기
+
+```{r}
+library(readr)
+datafile <- tempfile()
+cat(c(
+  "last first birth death\n",
+  "Fisher R.A. 1890 1962\n",
+  "Pearson Karl 1857 1936\n",
+  "Cox Gertrude 1900 1978\n",
+  "Yates Frank 1902 1994\n",
+  "Smith Kirstine 1878 1939\n"
+), file = datafile)
+tab1 <- read_table(datafile)
+tab1
+```
+
+```{r}
+read_table(
+  datafile,
+  col_types = c(
+    col_character(),
+    col_character(),
+    col_integer(),
+    col_integer()
+  ),
+  comment = "#"
+)
+```
+
+```{r}
+unlink(datafile)
+```
+
+```{r}
+# t <- read_table("./data/datafile_missing.tsv", na = ".")
+# t <- read_table("./data/datafile.ssv", comment = '#')
+```
+
+## 4.8 CSV 파일에서 읽기
+
+```{r}
+datafile <- tempfile(fileext = ".csv")
+cat(c(
+  "label,lbound,ubound\n",
+  "low,0,0.674\n",
+  "mid,0.674,1.64\n",
+  "high,1.64,2.33\n"
+),
+sep = "", file = datafile
+)
+
+tbl <- read_csv(datafile)
+# tbl <- read_csv(datafile, col_names = FALSE)
+
+tbl
+
+unlink(datafile)
+```
+
+## 4.9 CSV 파일에 쓰기
+
+```{r}
+write_csv(tbl, "tab1.csv")
+file.remove("tab1.csv")
+```
+
+## 4.10 웹에서 표 또는 CSV 데이터 읽기
+
+```{r}
+berkley <- read_csv("http://bit.ly/barkley18", comment = "#")
+berkley
+```
+
+## 4.11 엑셀에서 데이터 읽기
+
+```{r}
+library(openxlsx)
+# df1 <- read.xlsx(xlsxFile = "file.xlsx",
+#                  sheet = 'sheet_name')
+```
+
+```{r}
+# library(openxlsx)
+# wb <- loadWorkbook("data/excel_table_data.xlsx")
+# tables <- getTables(wb, 'input_data')
+# table_range_str <- names(tables[tables == 'example_table'])
+# table_range_refs <- strsplit(table_range_str, ':')[[1]]
+#
+# # use a regex to extract out the row numbers
+# table_range_row_num <- gsub("[^0-9.]", "", table_range_refs)
+#
+# # extract out the column numbers
+# table_range_col_num <- convertFromExcelRef(table_range_refs)
+```
+
+## 4.12 엑셀에 데이터 프레임 쓰기
+
+```{r}
+# library(openxlsx)
+# write.xlsx(df,
+#            sheetName = "some_sheet",
+#            file = "out_file.xlsx")
+```
+
+```{r}
+# library(openxlsx)
+#
+# wb <- loadWorkbook("data/excel_table_data.xlsx")
+# tables <- getTables(wb, 'input_data')
+# table_range_str <- names(tables[tables == 'example_table'])
+# table_range_refs <- strsplit(table_range_str, ':')[[1]]
+#
+# # use a regex to extract out the starting row number
+# table_row_num <- gsub("[^0-9.]", "", table_range_refs)[[1]]
+#
+# # extract out the starting column number
+# table_col_num <- convertFromExcelRef(table_range_refs)[[1]]
+```
+
+```{r}
+# removeTable(wb = wb,
+#             sheet = 'input_data',
+#             table = 'example_table')
+```
+
+```{r}
+# writeDataTable(
+#   wb = wb,
+#   sheet = 'input_data',
+#   x = iris,
+#   startCol = table_col_num,
+#   startRow = table_row_num,
+#   tableStyle = "TableStyleLight9",
+#   tableName = 'example_table'
+# )
+```
+
+```{r}
+# writeData(
+#   wb = wb,
+#   sheet = 'input_data',
+#   x = paste('example_table data refreshed on:', Sys.time()),
+#   startCol = 2,
+#   startRow = 5
+# )
+#
+# ## then save the workbook
+# saveWorkbook(wb = wb,
+#              file = "data/excel_table_data.xlsx",
+#              overwrite = TRUE)
+```
+
+## 4.13 SAS 파일에서 데이터 읽기
+
+```{r}
+# library(haven)
+#
+# sas_movie_data <- read_sas("data/movies.sas7bdat")
+```
+
+```{r}
+# sapply(sas_movie_data, attributes)
+```
+
+## 4.14 HTML 테이블에서 데이터 읽기
+
+```{r}
+# library(rvest)
+# library(tidyverse)
+#
+# all_tables <-
+#   read_html("URL") %>%
+#   html_table(fill = TRUE, header = TRUE)
+```
+
+```{r}
+library(rvest)
+
+all_tables <-
+  read_html("https://en.wikipedia.org/wiki/Aviation_accidents_and_incidents") %>%
+  html_table(fill = TRUE, header = TRUE)
+all_tables
+```
+
+```{r}
+out_table <-
+  all_tables %>%
+  magrittr::extract2(2)
+
+head(out_table)
+```
+
+```{r}
+url <- "http://en.wikipedia.org/wiki/World_population"
+tbls <- read_html(url) %>%
+  html_table(fill = TRUE, header = TRUE)
+tbls
+```
+
+```{r}
+library(magrittr)
+tbl <- tbls %>%
+  extract2(6)
+
+head(tbl, 2)
+```
+
+```{r}
+tbl[, c(2, 3)]
+```
+
+## 4.15 복잡한 구조의 파일 읽기
+
+```{r}
+# lines <- readLines("input.txt")
+# lines <- readLines("input.txt", n = 10)       # Read 10 lines and stop
+```
+
+```{r}
+# singles <- scan("./data/singles.txt", what = numeric(0))
+```
+
+```{r}
+# triples <-
+#   scan("./data/triples.txt",
+#        what = list(character(0), numeric(0), numeric(0)))
+# triples
+```
+
+```{r}
+# triples <- scan("./data/triples.txt",
+#                 what = list(
+#                   date = character(0),
+#                   high = numeric(0),
+#                   low = numeric(0)
+#                 ))
+# triples
+```
+
+```{r}
+# df_triples <- data.frame(triples)
+# df_triples
+```
+
+## 4.16 MySQL 데이터베이스에서 읽기
+
+```{r}
+# library(RMySQL)
+#
+# con <- dbConnect(
+#     drv = RMySQL::MySQL(),
+#     dbname = "your_db_name",
+#     host = "your.host.com",
+#     username = "userid",
+#     password = "pwd"
+#   )
+```
+
+```{r}
+# con <- dbConnect(
+#   drv = RMySQL::MySQL(),
+#   dbname = "your_db_name")
+```
+
+```{r}
+# sql <- "SELECT * from SurveyResults WHERE City = 'Chicago'"
+# rows <- dbGetQuery(con, sql)
+```
+
+```{r}
+# dbDisconnect(con)
+```
+
+## 4.17 dbplyr로 데이터베이스 접근하기
+
+```{r}
+# con <- DBI::dbConnect(RSQLite::SQLite(), ":memory:")
+# sleep_db <- copy_to(con, msleep, "sleep")
+```
+
+```{r}
+# little_sleep <- sleep_table %>%
+#   select(name, genus, order, sleep_total) %>%
+#   filter(sleep_total < 3)
+# show_query(little_sleep)
+```
+
+```{r}
+# local_little_sleep <- collect(little_sleep)
+# local_little_sleep
+```
+
+## 4.18 객체 저장 및 이동
+
+```{r}
+# save(tbl, t, file = "myData.RData")
+# load("myData.RData")
+```
+
+```{r}
+# dput(tbl, file = "myData.txt")
+# dump("tbl", file = "myData.txt")    # Note quotes around variable name
+```

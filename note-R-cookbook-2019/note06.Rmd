@@ -1,0 +1,175 @@
+---
+title: "note06"
+output: html_notebook
+---
+
+# 6 데이터 변환
+
+```{r}
+library(tidyverse)
+```
+
+## 6.1 각 목록 요소에 함수 적용하기
+
+```{r}
+lst <- list(
+  a = c(1, 2, 3),
+  b = c(4, 5, 6)
+)
+lst %>%
+  map(mean)
+```
+
+```{r}
+fun <- function(x) {
+  if (x > 1) {
+    1
+  } else {
+    "Less Than 1"
+  }
+}
+
+fun(5)
+fun(0.5)
+```
+
+```{r}
+lst <- list(.5, 1.5, .9, 2)
+map(lst, fun)
+```
+
+```{r}
+map_chr(lst, fun)
+```
+
+```{r}
+try(map_dbl(lst, fun))
+```
+
+## 6.2 데이터 프레임의 모든 행에 함수 적용하기
+
+```{r}
+fun <- function(a, b, c) {
+  sum(seq(a, b, c))
+}
+
+df <- data.frame(
+  mn = c(1, 2, 3),
+  mx = c(8, 13, 18),
+  rng = c(1, 2, 3)
+)
+
+df %>%
+  rowwise() %>%
+  mutate(output = fun(a = mn, b = mx, c = rng))
+```
+
+```{r}
+try(df %>%
+  mutate(output = fun(a = mn, b = mx, c = rng)))
+```
+
+## 6.3 행렬의 모든 행에 함수 적용하기
+
+```{r}
+long <- matrix(1:15, 3, 5)
+long
+```
+
+```{r}
+apply(long, 1, mean)
+```
+
+```{r}
+rownames(long) <- c("Moe", "Larry", "Curly")
+apply(long, 1, mean)
+```
+
+```{r}
+apply(long, 1, range)
+```
+
+## 6.4 모든 열에 함수 적용하기
+
+```{r}
+mat <- matrix(c(1, 3, 2, 5, 4, 6), 2, 3)
+colnames(mat) <- c("t1", "t2", "t3")
+mat
+```
+
+```{r}
+apply(mat, 2, mean)
+```
+
+## 6.5 병렬 벡터 또는 목록에 함수 적용하기
+
+```{r}
+gcd <- function(a, b) {
+  if (b == 0) {
+    return(a)
+  } else {
+    return(gcd(b, a %% b))
+  }
+}
+```
+
+```{r}
+try(gcd(c(1, 2, 3), c(9, 6, 3)))
+```
+
+```{r}
+a <- c(1, 2, 3)
+b <- c(9, 6, 3)
+my_gcds <- map2(a, b, gcd)
+my_gcds
+```
+
+```{r}
+unlist(my_gcds)
+```
+
+```{r}
+map2_chr(a, b, gcd)
+map2_dbl(a, b, gcd)
+```
+
+```{r}
+lst <- list(a, b)
+pmap(lst, gcd)
+```
+
+```{r}
+pmap_dbl(lst, gcd)
+```
+
+## 6.6 데이터 그룹에 함수 적용하기
+
+```{r}
+df <- tibble(
+  my_group = c("A", "B", "A", "B", "A", "B"),
+  values = 1:6
+)
+df
+```
+
+```{r}
+df %>%
+  group_by(my_group) %>%
+  summarize(
+    avg_values = mean(values),
+    tot_values = sum(values),
+    count_values = n()
+  )
+```
+
+## 6.7 일부 조건을 기반으로 새 열 만들기
+
+```{r}
+df <- data.frame(vals = 1:5)
+df %>%
+  mutate(new_vals = case_when(
+    vals <= 2 ~ "2 or less",
+    vals > 2 & vals <= 4 ~ "2 to 4",
+    TRUE ~ "over 4"
+  ))
+```

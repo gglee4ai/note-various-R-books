@@ -1,0 +1,200 @@
+---
+title: "note13"
+output: html_notebook
+---
+
+# 13 기본 수치와 통계를 넘어
+
+## 13.1 단일 매개변수 함수의 최소화 또는 최대화
+
+```{r}
+f <- function(x) {
+  3 * x^4 - 2 * x^3 + 3 * x^2 - 4 * x + 5
+}
+curve(f, -20, 20)
+```
+
+```{r}
+optimize(f, lower = -20, upper = 20)
+```
+
+## 13.2 다중 매개변수 기능의 최소화 또는 최대화
+
+```{r}
+load(file = "./data/opt.rdata") # loads x, y, z
+f <- function(v) {
+  a <- v[1]
+  b <- v[2]
+  sum(abs(z - ((x + a)^b)))
+}
+
+optim(c(1, 1), f)
+```
+
+## 13.3 고유값과 고유벡터 계산하기
+
+```{r}
+fibmat <- matrix(c(0, 1, 1, 1), ncol = 2, nrow = 2)
+fibmat
+```
+
+```{r}
+eigen(fibmat)
+```
+
+## 13.4 주성분 분석 수행
+
+```{r}
+r <- prcomp(~ x + y + z)
+summary(r)
+```
+
+```{r}
+load("data/pca.rdata")
+r <- prcomp(~ x + y)
+r
+```
+
+```{r}
+summary(r)
+```
+
+```{r}
+plot(r)
+```
+
+```{r}
+predict(r)
+```
+
+## 13.5 단순 직교 회귀 수행하기
+
+```{r}
+load("data/pca.rdata")
+r <- prcomp(~ x + y)
+slope <- r$rotation[2, 1] / r$rotation[1, 1]
+intercept <- r$center[2] - slope * r$center[1]
+```
+
+```{r}
+par(pty = "s")
+plot(x, y)
+abline(intercept, slope, col = "red")
+```
+
+## 13.6 데이터에서 클러스터 찾기
+
+```{r}
+means <- sample(c(-3, 0, 3), 99, replace = TRUE)
+x <- rnorm(99, mean = means)
+tapply(x, factor(means), mean)
+```
+
+```{r}
+d <- dist(x)
+hc <- hclust(d)
+```
+
+```{r}
+plot(hc)
+```
+
+```{r}
+clust <- cutree(hc, k = 3)
+clust
+```
+
+```{r}
+tapply(x, clust, mean)
+```
+
+```{r}
+library(ggplot2)
+library(patchwork)
+
+df_cluster <- data.frame(x, means = factor(means), clust = factor(clust))
+
+g1 <-
+  df_cluster |>
+  ggplot(aes(means, x)) +
+  geom_boxplot() +
+  labs(title = "Original Clusters", x = "Cluster Mean")
+
+g2 <-
+  df_cluster |>
+  ggplot(aes(clust, x)) +
+  geom_boxplot() +
+  labs(title = "Identified Clusters", x = "Cluster Number")
+
+g1 + g2
+```
+
+## 13.7 이진 값 변수 예측(로지스틱 회귀)
+
+```{r}
+data(pima, package = "faraway")
+pima
+```
+
+```{r}
+b <- factor(pima$test)
+m <- glm(b ~ diastolic + bmi, family = binomial, data = pima)
+summary(m)
+```
+
+```{r}
+m.red <- glm(b ~ bmi, family = binomial, data = pima)
+summary(m.red)
+```
+
+```{r}
+newdata <- data.frame(bmi = seq(1, 100, length.out = 100))
+plot(newdata$bmi, predict(m.red, newdata = newdata, type = "response"))
+```
+
+```{r}
+newdata <- data.frame(bmi = quantile(pima$bmi, .90))
+predict(m.red, type = "response", newdata = newdata)
+```
+
+## 13.8 통계 부트스트랩
+
+```{r}
+stat <- function(data, indices) {
+  r <- prcomp(~ x + y, data = data, subset = indices)
+  slope <- r$rotation[2, 1] / r$rotation[1, 1]
+  return(slope)
+}
+```
+
+```{r}
+load(file = "./data/pca.rdata")
+library(boot)
+set.seed(3) # for reproducability
+
+boot.data <- data.frame(x = x, y = y)
+reps <- boot(boot.data, stat, R = 999)
+```
+
+```{r}
+boot.ci(reps, type = c("perc", "bca"))
+```
+
+## 13.9 요인 분석
+
+```{r}
+load("data/diffs.rdata")
+str(diffs)
+```
+
+```{r}
+plot(prcomp(diffs))
+```
+
+```{r}
+factanal(diffs, factors = 2)
+```
+
+```{r}
+factanal(diffs, factors = 3)
+```

@@ -1,0 +1,244 @@
+---
+title: "note09"
+output: html_notebook
+---
+
+# 9 일반 통계
+
+## 9.1 데이터 요약
+
+```{r}
+summary(cars)
+```
+
+```{r}
+sapply(as.list(cars), summary)
+```
+
+## 9.2 상대 빈도 계산
+
+```{r}
+x <- rnorm(100)
+mean(x > 0)
+```
+
+## 9.3 요인을 도표화하고 분할표 만들기
+
+```{r}
+set.seed(42)
+initial <- factor(sample(c("Yes", "No", "Maybe"), 100, replace = TRUE))
+outcome <- factor(sample(c("Pass", "Fail"), 100, replace = TRUE))
+table(initial)
+table(outcome)
+```
+
+```{r}
+table(initial, outcome)
+```
+
+```{r}
+xtabs(~ initial + outcome, data = data.frame(initial, outcome))
+```
+
+## 9.4 독립성을 위한 범주형 변수 테스트
+
+```{r}
+summary(table(initial, outcome))
+```
+
+## 9.5 데이터 세트의 분위수(및 사분위수) 계산
+
+```{r}
+vec <- runif(1000)
+quantile(vec, .05)
+quantile(vec, c(.05, .95))
+quantile(vec)
+```
+
+## 9.6 분위수 반전
+
+```{r}
+mean(vec < 0.5)
+```
+
+## 9.7 데이터를 z-점수로 변환
+
+```{r}
+str(scale(x))
+```
+
+```{r}
+(x - mean(x)) / sd(x)
+```
+
+## 9.8 표본의 평균 검정(t 검정)
+
+```{r}
+set.seed(100)
+x <- rnorm(75, mean = 100, sd = 15)
+t.test(x, mu = 95)
+```
+
+```{r}
+t.test(x, mu = 100)
+```
+
+## 9.9 평균에 대한 신뢰 구간 형성
+
+```{r}
+t.test(x)
+```
+
+```{r}
+t.test(x, conf.level = 0.99)
+```
+
+## 9.10 중앙값에 대한 신뢰 구간 형성
+
+```{r}
+wilcox.test(x, conf.int = TRUE)
+```
+
+```{r}
+median(x)
+```
+
+## 9.11 샘플 비율 테스트
+
+컵스는 20경기를 치렀고 그 중 11경기를 이겼으며, 이는 전체 경기의 55%입니다. 그 증거를 바탕으로 팬은 컵스가 올해 경기의 절반 이상을 이길 것이라고 "매우 확신합니다". 그가 그렇게 자신감이 있어야 합니까?
+
+```{r}
+prop.test(11, 20, 0.5, alternative = "greater")
+```
+
+## 9.12 비율에 대한 신뢰 구간 형성
+
+```{r}
+prop.test(6, 9)
+```
+
+```{r}
+prop.test(6, 9, conf.level = 0.99)
+```
+
+## 9.13 정규성 테스트
+
+```{r}
+x <- runif(100)
+shapiro.test(x)
+```
+
+```{r}
+y <- rnorm(100)
+shapiro.test(y)
+```
+
+## 9.14 실행 테스트
+
+```{r}
+s <- sample(c(0, 1), 100, replace = T)
+tseries::runs.test(as.factor(s))
+```
+
+```{r}
+s <- c(0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0)
+tseries::runs.test(as.factor(s))
+```
+
+## 9.15 두 표본의 평균 비교
+
+```{r}
+load("./data/sat.rdata")
+df <- data.frame(x, y)
+```
+
+```{r}
+library(ggplot2)
+df |>
+  ggplot() +
+  geom_density(aes(x)) +
+  geom_density(aes(y), color = "red")
+```
+
+```{r}
+t.test(x, y)
+```
+
+```{r}
+df |>
+  ggplot(aes(x - y)) +
+  geom_histogram()
+```
+
+```{r}
+t.test(x, y, paired = TRUE)
+```
+
+## 9.16 두 표본의 위치를 비모수적으로 비교하기
+
+```{r}
+load(file = "./data/workers.rdata")
+wilcox.test(fav, unfav, paired = TRUE)
+```
+
+## 9.17 유의미한 상관관계 테스트
+
+```{r}
+x <- rnorm(20)
+y <- rnorm(20)
+cor(x, y)
+```
+
+```{r}
+cor.test(x, y)
+```
+
+```{r}
+cor.test(x, y, method = "spearman")
+```
+
+## 9.18 동일한 비율에 대한 테스트 그룹
+
+```{r}
+sucesses <- c(14, 10)
+trials <- c(38, 40)
+prop.test(sucesses, trials)
+```
+
+## 9.19 그룹 평균 간의 쌍별 비교 수행
+
+```{r}
+freshmen <- c(1, 2, 1, 1, 5)
+sophomores <- c(3, 2, 3, 3, 5)
+juniors <- c(5, 3, 4, 3, 3)
+
+comb <- stack(list(fresh = freshmen, soph = sophomores, jrs = juniors))
+print(comb)
+```
+
+```{r}
+pairwise.t.test(comb$values, comb$ind)
+```
+
+## 9.20 같은 분포에 대해 두 개의 표본 테스트하기
+
+```{r}
+x <- rnorm(100, mean = 4, sd = 6)
+y <- rnorm(100, mean = 4, sd = 4)
+z <- rnorm(100, mean = 4, sd = 6)
+```
+
+```{r}
+ks.test(x, y)
+ks.test(x, z)
+```
+
+```{r}
+rbind(
+  data.frame(group = "x", value = x),
+  data.frame(group = "y", value = y),
+  data.frame(group = "z", value = z)
+) |>
+  ggplot(aes(value, color = group)) +
+  geom_density()
+```
