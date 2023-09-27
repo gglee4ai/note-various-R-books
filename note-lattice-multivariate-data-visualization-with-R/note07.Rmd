@@ -1,0 +1,114 @@
+---
+title: "note07"
+output: html_notebook
+---
+
+# 7 Graphical Parameters and Other Settings
+
+## 7.1 The parameter system
+
+```{r}
+library(lattice)
+```
+
+```{r}
+vad.plot <-
+  dotplot(
+    reorder(Var2, Freq) ~ Freq | Var1,
+    data = as.data.frame.table(VADeaths),
+    origin = 0,
+    type = c("p", "h"),
+    main = "Death Rates in Virginia - 1940",
+    xlab = "Number of deaths per 100"
+  )
+vad.plot
+```
+
+```{r}
+dot.line.settings <- trellis.par.get("dot.line")
+str(dot.line.settings)
+```
+
+```{r}
+dot.line.settings$col <- "transparent"
+trellis.par.set("dot.line", dot.line.settings)
+vad.plot
+```
+
+```{r}
+plot.line.settings <- trellis.par.get("plot.line")
+str(plot.line.settings)
+```
+
+```{r}
+plot.line.settings$lwd <- 2
+trellis.par.set("plot.line", plot.line.settings)
+trellis.par.set("dot.line", dot.line.settings)
+vad.plot
+```
+
+```{r}
+panel.dotline <-
+  function(x, y,
+           col = dot.symbol$col, pch = dot.symbol$pch,
+           cex = dot.symbol$cex, alpha = dot.symbol$alpha,
+           col.line = plot.line$col, lty = plot.line$lty,
+           lwd = plot.line$lwd, alpha.line = plot.line$alpha, ...) {
+    dot.symbol <- trellis.par.get("dot.symbol")
+    plot.line <- trellis.par.get("plot.line")
+    panel.segments(0, y, x, y,
+      col = col.line, lty = lty,
+      lwd = lwd, alpha = alpha.line
+    )
+    panel.points(x, y,
+      col = col, pch = pch,
+      cex = cex, alpha = alpha
+    )
+  }
+```
+
+```{r}
+update(vad.plot, lwd = 2, panel = panel.dotline)
+```
+
+```{r}
+trellis.par.set(list(
+  dot.line = list(col = "transparent"),
+  plot.line = list(lwd = 2)
+))
+vad.plot
+```
+
+```{r}
+update(
+  vad.plot,
+  par.settings = list(
+    dot.line = list(col = "transparent"),
+    plot.line = list(lwd = 2)
+  )
+)
+```
+
+## 7.2 Available graphical parameters
+
+```{r}
+names(trellis.par.get())
+```
+
+```{r}
+show.settings()
+```
+
+```{r}
+str(trellis.par.get("layout.heights"))
+```
+
+## 7.3 Non-graphical options
+
+```{r}
+names(lattice.options())
+```
+
+```{r}
+lattice.getOption("default.theme")
+```

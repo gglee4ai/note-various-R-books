@@ -1,0 +1,135 @@
+---
+title: "note04"
+output: html_notebook
+---
+
+# 4 Displaying Multiway Tables
+
+## 4.1 Cleveland dot plot
+
+```{r}
+library(lattice)
+```
+
+```{r}
+VADeaths
+```
+
+```{r}
+class(VADeaths)
+```
+
+```{r}
+methods(dotplot)
+```
+
+```{r}
+dotplot(VADeaths, groups = FALSE)
+```
+
+```{r, fig.width=4, fig.height=4}
+dotplot(VADeaths,
+  groups = FALSE,
+  layout = c(1, 4), aspect = 0.7,
+  origin = 0, type = c("p", "h"),
+  main = "Death Rates in Virginia - 1940",
+  xlab = "Rate (per 1000)"
+)
+```
+
+```{r}
+dotplot(VADeaths,
+  type = "o",
+  auto.key = list(lines = TRUE, space = "right"),
+  main = "Death Rates in Virginia - 1940",
+  xlab = "Rate (per 1000)"
+)
+```
+
+## 4.2 Bar chart
+
+```{r, fig.width=4, fig.height=4}
+barchart(VADeaths,
+  groups = FALSE,
+  layout = c(1, 4),
+  aspect = 0.7,
+  reference = FALSE,
+  main = "Death Rates in Virginia - 1940",
+  xlab = "Rate (per 1000)"
+)
+```
+
+```{r}
+data(postdoc, package = "latticeExtra")
+class(postdoc)
+```
+
+```{r}
+barchart(prop.table(postdoc, margin = 1),
+  xlab = "Proposrtion",
+  auto.key = list(adj = 1)
+)
+```
+
+```{r}
+dotplot(prop.table(postdoc, margin = 1),
+  groups = FALSE,
+  xlab = "Propostion",
+  par.strip.text = list(abbreviate = TRUE, minlength = 10)
+)
+```
+
+```{r, fig.width=4.5, fig.height=4.5}
+dotplot(prop.table(postdoc, margin = 1),
+  groups = FALSE,
+  index.cond = function(x, y) median(x),
+  layout = c(1, 5), aspect = 0.6,
+  xlab = "Proportion",
+  scales = list(y = list(relation = "free", rot = 0)),
+  prepanel = function(x, y) {
+    list(ylim = levels(reorder(y, x)))
+  },
+  panel = function(x, y, ...) {
+    panel.dotplot(x, reorder(y, x), ...)
+  }
+)
+```
+
+```{r}
+data(Chem97, package = "mlmRev")
+gcsescore.tab <- xtabs(~ gcsescore + gender, Chem97)
+head(gcsescore.tab)
+```
+
+```{r}
+gcsescore.df <- as.data.frame(gcsescore.tab)
+gcsescore.df
+```
+
+```{r}
+gcsescore.df$gcsescore <- as.numeric(as.character(gcsescore.df$gcsescore))
+```
+
+```{r}
+xyplot(Freq ~ gcsescore | gender,
+  data = gcsescore.df,
+  type = "h",
+  layout = c(1, 2),
+  xlab = "Average GCSE Score"
+)
+```
+
+```{r}
+score.tab <- xtabs(~ score + gender, Chem97)
+score.df <- as.data.frame(score.tab)
+barchart(Freq ~ score | gender, score.df, origin = 0)
+```
+
+```{r}
+barchart(Freq ~ score,
+  data = score.df,
+  groups = gender,
+  auto.key = TRUE,
+  origin = 0
+)
+```
