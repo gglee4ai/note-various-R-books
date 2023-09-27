@@ -1,0 +1,29 @@
+---
+title: "R Notebook"
+output: html_notebook
+params:
+  start_date: '2020-01-01'
+  end_date: '2020-06-01'
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r}
+rmarkdown::find_pandoc()
+```
+
+```{r}
+params$start_date
+```
+
+```{r}
+x <- 5  # radius of a circle
+```
+
+for a circle with the radius `r x`, 
+its area is `r pi * x^2`.
+
+```{r}
+plot(cars)
+```
+

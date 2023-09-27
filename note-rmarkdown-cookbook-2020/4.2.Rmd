@@ -1,0 +1,16 @@
+---
+author: "Smart Analyst"
+output: pdf_document
+---
+
+I just tried really hard to calculate our market share:
+
+```{r}
+share <- runif(1)
+```
+
+---
+title: "Our market share is `r round(100 * share, 2)`% now!"
+---
+
+I feel `r if(share > 0.8) "happy" else "sad"` about it.

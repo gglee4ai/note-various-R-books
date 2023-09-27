@@ -1,0 +1,19 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+xfun::pkg_load2(c("htmltools", "mime"))
+```
+
+```{r echo=FALSE}
+# a single file
+#xfun::embed_file('5.Rmd')
+
+# multiple files
+xfun::embed_files(c('5.Rmd', '5.pdf'))
+
+# a directory
+#xfun::embed_dir('data/', text = 'Download full data')
+```
