@@ -1,0 +1,256 @@
+---
+title: "note11"
+output: html_notebook
+---
+
+```{r}
+library(fpp2)
+library(ggplot2)
+theme_set(theme_gray(base_family = "NanumGothic"))
+```
+
+# 11 고급 예측 기법
+
+## 11.1 복잡한 계절성
+
+```{r}
+p1 <- autoplot(calls) +
+  ylab("통화량") +
+  xlab("주차") +
+  scale_x_continuous(breaks = seq(1, 33, by = 2))
+
+p2 <- autoplot(window(calls, end = 4)) +
+  scale_x_continuous(minor_breaks = seq(1, 4, by = 0.2))
+gridExtra::grid.arrange(p1, p2)
+```
+
+```{r}
+calls |>
+  mstl() |>
+  autoplot()
+```
+
+```{r}
+calls |>
+  stlf() |>
+  autoplot() +
+  xlab("주차")
+```
+
+```{r}
+fit <- auto.arima(calls,
+  seasonal = FALSE, lambda = 0,
+  xreg = fourier(calls, K = c(10, 10))
+)
+fit
+```
+
+```{r}
+fit |>
+  forecast(xreg = fourier(calls, K = c(10, 10), h = 2 * 169)) |>
+  autoplot(include = 5 * 169) +
+  ylab("통화량") +
+  xlab("주차")
+```
+
+```{r}
+calls %>%
+  subset(start = length(calls) - 2000) %>%
+  tbats() -> fit2
+fc2 <- forecast(fit2, h = 2 * 169)
+autoplot(fc2, include = 5 * 169) +
+  ylab("통화량") + xlab("주차")
+```
+
+```{r}
+elecdemand[, c("Demand", "Temperature")] |>
+  autoplot(facets = TRUE) +
+  scale_x_continuous(
+    minor_breaks = NULL,
+    breaks = 2014 +
+      cumsum(c(0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30)) / 365,
+    labels = month.abb
+  ) +
+  xlab("시간") + ylab("")
+```
+
+```{r}
+elecdemand |>
+  as.data.frame() |>
+  ggplot(aes(Temperature, Demand)) +
+  geom_point(alpha = 0.1) +
+  xlab("기온 (섭씨)") +
+  ylab("수요 (GW)")
+```
+
+```{r}
+cooling <- pmax(elecdemand[, "Temperature"], 18)
+fit <- auto.arima(elecdemand[, "Demand"],
+  xreg = cbind(fourier(elecdemand, c(10, 10, 0)),
+    heating = elecdemand[, "Temperature"],
+    cooling = cooling
+  )
+)
+```
+
+```{r}
+temps <- subset(elecdemand[, "Temperature"],
+  start = NROW(elecdemand) - 2 * 48 + 1
+)
+fc <- forecast(fit,
+  xreg = cbind(fourier(temps, c(10, 10, 0)),
+    heating = temps, cooling = pmax(temps, 18)
+  )
+)
+autoplot(fc, include = 14 * 48)
+```
+
+```{r}
+checkresiduals(fc)
+```
+
+## 11.2 벡터 자기회귀
+
+```{r}
+library(vars)
+```
+
+```{r}
+VARselect(uschange[, 1:2],
+  lag.max = 8,
+  type = "const"
+)[["selection"]]
+```
+
+```{r}
+var1 <- VAR(uschange[, 1:2], p = 1, type = "const")
+serial.test(var1, lags.pt = 10, type = "PT.asymptotic")
+```
+
+```{r}
+var2 <- VAR(uschange[, 1:2], p = 2, type = "const")
+serial.test(var2, lags.pt = 10, type = "PT.asymptotic")
+```
+
+```{r}
+var3 <- VAR(uschange[, 1:2], p = 3, type = "const")
+serial.test(var3, lags.pt = 10, type = "PT.asymptotic")
+```
+
+```{r}
+forecast(var3) |>
+  autoplot() +
+  xlab("Year")
+```
+
+## 11.3 신경망 모델
+
+```{r}
+fit <- nnetar(sunspotarea, lambda = 0)
+autoplot(forecast(fit, h = 30))
+```
+
+```{r}
+sim <- ts(matrix(0, nrow = 30L, ncol = 9L), start = end(sunspotarea)[1L] + 1L)
+for (i in seq(9)) {
+  sim[, i] <- simulate(fit, nsim = 30L)
+}
+autoplot(sunspotarea) +
+  autolayer(sim)
+```
+
+```{r}
+fcast <- forecast(fit, PI = TRUE, h = 30)
+autoplot(fcast)
+```
+
+## 11.4 붓스트랩과 배깅
+
+```{r}
+bootseries <-
+  bld.mbb.bootstrap(debitcards, 10) |>
+  as.data.frame() |>
+  ts(start = 2000, frequency = 12)
+str(bootseries)
+```
+
+```{r}
+autoplot(debitcards) +
+  autolayer(bootseries, colour = TRUE) +
+  autolayer(debitcards, colour = FALSE) +
+  ylab("붓스트랩한 시계열") +
+  guides(color = "none")
+```
+
+```{r}
+nsim <- 1000L
+sim <- bld.mbb.bootstrap(debitcards, nsim)
+```
+
+```{r}
+h <- 36L
+future <- matrix(0, nrow = nsim, ncol = h)
+for (i in seq(nsim)) {
+  future[i, ] <- simulate(ets(sim[[i]]), nsim = h)
+}
+```
+
+```{r}
+start <- tsp(debitcards)[2] + 1 / 12
+simfc <- structure(list(
+  mean = ts(colMeans(future), start = start, frequency = 12),
+  lower = ts(apply(future, 2, quantile, prob = 0.025),
+    start = start, frequency = 12
+  ),
+  upper = ts(apply(future, 2, quantile, prob = 0.975),
+    start = start, frequency = 12
+  ),
+  level = 95
+),
+class = "forecast"
+)
+```
+
+```{r}
+etsfc <- forecast(ets(debitcards), h = h, level = 95)
+autoplot(debitcards) +
+  ggtitle("아이슬란드의 월별 소매 직불 카드 사용량") +
+  xlab("연도") + ylab("백만 ISK") +
+  autolayer(simfc, series = "모사한 것") +
+  autolayer(etsfc, series = "ETS")
+```
+
+```{r}
+sim <- bld.mbb.bootstrap(debitcards, 10) %>%
+  as.data.frame() %>%
+  ts(frequency = 12, start = 2000)
+fc <- purrr::map(
+  as.list(sim),
+  function(x) {
+    forecast(ets(x))[["mean"]]
+  }
+) %>%
+  as.data.frame() %>%
+  ts(frequency = 12, start = start)
+autoplot(debitcards) +
+  autolayer(sim, colour = TRUE) +
+  autolayer(fc, colour = TRUE) +
+  autolayer(debitcards, colour = FALSE) +
+  ylab("붓스트랩한 시계열") +
+  guides(colour = "none")
+```
+
+```{r}
+etsfc <- debitcards %>%
+  ets() %>%
+  forecast(h = 36)
+baggedfc <- debitcards %>%
+  baggedETS() %>%
+  forecast(h = 36)
+autoplot(debitcards) +
+  autolayer(baggedfc, series = "배깅한ETS", PI = FALSE) +
+  autolayer(etsfc, series = "ETS", PI = FALSE) +
+  guides(colour = guide_legend(title = "예측값"))
+```
+
+## 11.5 연습 문제

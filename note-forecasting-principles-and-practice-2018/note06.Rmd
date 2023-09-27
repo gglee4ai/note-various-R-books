@@ -1,0 +1,203 @@
+---
+title: "note06"
+output: html_notebook
+---
+
+# 6 시계열 분해
+
+## 6.2 이동평균
+
+```{r}
+library(fpp2)
+library(ggplot2)
+theme_set(theme_gray(base_family = "NanumGothic"))
+```
+
+```{r}
+autoplot(elecsales) +
+  xlab("Year") +
+  ylab("GWh") +
+  ggtitle("연간 전력 판매: 남 호주")
+```
+
+```{r}
+mean(elecsales[1:5])
+```
+
+```{r}
+cbind(elecsales, ma(elecsales, order = 5))
+```
+
+```{r}
+autoplot(elecsales, series = "Data") +
+  autolayer(ma(elecsales, 5), series = "5-MA") +
+  xlab("Year") + ylab("GWh") +
+  ggtitle("연간 전력 판매량: 남 호주") +
+  scale_colour_manual(
+    values = c("Data" = "grey50", "5-MA" = "red"),
+    breaks = c("Data", "5-MA")
+  ) +
+  guides(color = guide_legend(title = " "))
+```
+
+```{r}
+autoplot(elecsales, series = "Data") +
+  autolayer(ma(elecsales, 3), series = "3-MA") +
+  xlab("Year") + ylab("GWh") +
+  ggtitle("연간 전력 판매량: 남 호주") +
+  scale_colour_manual(
+    values = c("Data" = "grey50", "3-MA" = "red"),
+    breaks = c("Data", "3-MA")
+  ) +
+  guides(color = guide_legend(title = " "))
+```
+
+```{r}
+autoplot(elecsales, series = "Data") +
+  autolayer(ma(elecsales, 7), series = "7-MA") +
+  xlab("Year") + ylab("GWh") +
+  ggtitle("연간 전력 판매량: 남 호주") +
+  scale_colour_manual(
+    values = c("Data" = "grey50", "7-MA" = "red"),
+    breaks = c("Data", "7-MA")
+  ) +
+  guides(color = guide_legend(title = " "))
+```
+
+```{r}
+autoplot(elecsales, series = "Data") +
+  autolayer(ma(elecsales, 9), series = "9-MA") +
+  xlab("Year") + ylab("GWh") +
+  ggtitle("연간 전력 판매량: 남 호주") +
+  scale_colour_manual(
+    values = c("Data" = "grey50", "9-MA" = "red"),
+    breaks = c("Data", "9-MA")
+  ) +
+  guides(color = guide_legend(title = " "))
+```
+
+```{r}
+beer2 <- window(ausbeer, start = 1992)
+ma4 <- ma(beer2, order = 4, centre = FALSE)
+ma2x4 <- ma(beer2, order = 4, centre = TRUE)
+ma2x4_ <- ma(beer2, order = 4)
+cbind(beer2, ma4, ma2x4, ma2x4_)
+```
+
+```{r}
+mean(c(mean(beer2[1:4]), mean(beer2[2:5])))
+```
+
+```{r}
+elecequip |>
+  autoplot(series = "Data") +
+  autolayer(ma(elecequip, 12), series = "12-MA") +
+  xlab("연도") + ylab("신규 주문 지수") +
+  ggtitle("전자 장비 제조 (유럽 지역)") +
+  scale_colour_manual(
+    values = c("데이터" = "grey", "12-MA" = "red"),
+    breaks = c("데이터", "12-MA")
+  ) +
+  guides(colour = guide_legend(title = " "))
+```
+
+## 6.3 고전적인 분해법
+
+```{r}
+elecequip |>
+  decompose(type = "multiplicative") |>
+  autoplot() +
+  xlab("Year") +
+  ggtitle("전자 장비 지수의 고전적 곱셈 분해")
+```
+
+```{r}
+elecequip |>
+  decompose() |>
+  autoplot() +
+  xlab("Year") +
+  ggtitle("전자 장비 지수의 고전적 덧셈 분해")
+```
+
+## 6.4 X11 분해
+
+```{r}
+# install.packages("seasonal")
+library(seasonal)
+```
+
+```{r}
+elecequip |>
+  seas(x11 = "") ->
+fit
+autoplot(fit) +
+  ggtitle("전자 장비 지수의 X11 분해")
+```
+
+```{r}
+autoplot(elecequip, series = "Data") +
+  autolayer(trendcycle(fit), series = "Trend") +
+  autolayer(seasadj(fit), series = "Seasonal adjusted") +
+  xlab("연도") +
+  ylab("신규 주문 지수") +
+  ggtitle("전자 장비 제조 (유럽 지역)") +
+  scale_color_manual(
+    values = c("gray", "blue", "red"),
+    breaks = c("Data", "Seasonal adjusted", "Trend")
+  )
+```
+
+```{r}
+fit |>
+  seasonal() |>
+  ggsubseriesplot() +
+  ylab("계절성")
+```
+
+## 6.5 SEATS 분해
+
+```{r}
+elecequip |>
+  seas() |>
+  autoplot() +
+  ggtitle("전자 장비 지수의 SEATS 분해")
+```
+
+## 6.6 STL 분해
+
+```{r}
+elecequip |>
+  stl(t.window = 13, s.window = "periodic", robust = TRUE) |>
+  autoplot()
+```
+
+## 6.7 추세와 계절성의 강도를 측정하기
+
+## 6.8 분해법으로 예측하기
+
+```{r}
+fit <- stl(elecequip, t.window = 13, s.window = "periodic", robust = TRUE)
+fit |>
+  seasadj() |>
+  naive() |>
+  autoplot() +
+  ylab("신규 구매 지수") +
+  ggtitle("계절성으로 조정된 데이터의 단순 예측값")
+```
+
+```{r}
+fit |>
+  forecast(method = "naive") |>
+  autoplot() +
+  ylab("신규 구매 지수") +
+  ggtitle("STL과 확률보행으로 얻은 예측값")
+```
+
+```{r}
+fcast <- stlf(elecequip, method = "naive")
+fcast |>
+  forecast() |>
+  autoplot()
+```
+
+## 6.9 연습문제

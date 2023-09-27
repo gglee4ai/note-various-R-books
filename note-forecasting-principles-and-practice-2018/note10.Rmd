@@ -1,0 +1,210 @@
+---
+title: "note10"
+output: html_notebook
+---
+
+```{r}
+library(fpp2)
+library(ggplot2)
+theme_set(theme_gray(base_family = "NanumGothic"))
+```
+
+# 10 계층적 시계열 또는 그룹화된 시계열을 예측하기
+
+## 10.1 계층적 시계열
+
+```{r}
+# install.packages("hts")
+library(hts)
+```
+
+```{r}
+str(visnights)
+```
+
+```{r}
+tourism.hts <- hts(visnights, characters = c(3, 5))
+tourism.hts |>
+  aggts(levels = 0:1) |>
+  autoplot(facet = TRUE) +
+  xlab("연도") + ylab("백만") + ggtitle("숙박일수")
+```
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+cols <- sample(scales::hue_pal(
+  h = c(15, 375),
+  c = 100, l = 65, h.start = 0, direction = 1
+)(NCOL(visnights)))
+as_tibble(visnights) |>
+  gather(Zone) |>
+  mutate(Date = rep(time(visnights), NCOL(visnights)), State = str_sub(Zone, 1, 3)) |>
+  ggplot(aes(Date, value, group = Zone, color = Zone)) +
+  geom_line() +
+  facet_grid(State ~ ., scales = "free_y") +
+  xlab("연도") +
+  ylab("백만") +
+  ggtitle("지역별 숙박일수") +
+  scale_color_manual(values = cols)
+```
+
+## 10.2 그룹화된 시계열
+
+```{r}
+prison.gts <- gts(prison / 1e3,
+  characters = c(3, 1, 9),
+  gnames = c(
+    "주", "성별", "법적 상태",
+    "주*성별", "주*법적 상태",
+    "주*법적 상태"
+  )
+)
+prison.gts
+```
+
+```{r}
+prison.gts |>
+  aggts(level = 0:3) |>
+  autoplot()
+```
+
+```{r}
+groups <- aggts(prison.gts, level = 1:3)
+autoplot(groups)
+```
+
+```{r, fig.asp=1}
+p1 <- prison.gts %>%
+  aggts(level = 0) %>%
+  autoplot() + ggtitle("호주 수감 인구") +
+  xlab("연도") + ylab("전체 수감 인구수 ('000)")
+groups <- aggts(prison.gts, level = 1:3)
+cols <- sample(scales::hue_pal(
+  h = c(15, 375),
+  c = 100, l = 65, h.start = 0, direction = 1
+)(NCOL(groups)))
+p2 <- as_tibble(groups) %>%
+  gather(Series) %>%
+  mutate(
+    Date = rep(time(groups), NCOL(groups)),
+    Group = str_extract(Series, "([A-Za-z ]*)")
+  ) %>%
+  ggplot(aes(x = Date, y = value, group = Series, colour = Series)) +
+  geom_line() +
+  xlab("연도") +
+  ylab("수감 인구수 ('000)") +
+  scale_colour_manual(values = cols) +
+  facet_grid(. ~ Group, scales = "free_y") +
+  scale_x_continuous(breaks = seq(2006, 2016, by = 2)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+gridExtra::grid.arrange(p1, p2, ncol = 1)
+```
+
+## 10.3 상향식 접근 방식
+
+```{r}
+forecast(prison.gts, method = "bu", fmethod = "arima")
+```
+
+## 10.4 하향식 접근 방식
+
+## 10.5 중간 접근 방식
+
+## 10.6 사상 행렬
+
+## 10.7 최적 조정 접근법
+
+```{r}
+prisonfc <- forecast(prison.gts)
+prisonfc
+```
+
+```{r}
+fcsts <- aggts(prisonfc, levels = 0:3)
+groups <- aggts(prison.gts, levels = 0:3)
+autoplot(fcsts) +
+  autolayer(groups)
+```
+
+```{r, fig.width = 5, fig.height=5}
+prisonfc <- ts(rbind(groups, fcsts),
+  start = start(groups), frequency = 4
+)
+p1 <- autoplot(prisonfc[, "Total"]) +
+  ggtitle("호주 수감 인구") +
+  xlab("연도") + ylab("전체 수감자 수 ('000)") +
+  geom_vline(xintercept = 2017)
+cols <- sample(scales::hue_pal(
+  h = c(15, 375),
+  c = 100, l = 65, h.start = 0, direction = 1
+)(NCOL(groups)))
+p2 <- as_tibble(prisonfc[, -1]) %>%
+  gather(Series) %>%
+  mutate(
+    Date = rep(time(prisonfc), NCOL(prisonfc) - 1),
+    Group = str_extract(Series, "([A-Za-z ]*)")
+  ) %>%
+  ggplot(aes(x = Date, y = value, group = Series, colour = Series)) +
+  geom_line() +
+  xlab("연도") +
+  ylab("수감자 수 ('000)") +
+  scale_colour_manual(values = cols) +
+  facet_grid(. ~ Group, scales = "free_y") +
+  scale_x_continuous(breaks = seq(2006, 2018, by = 2)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  geom_vline(xintercept = 2017)
+gridExtra::grid.arrange(p1, p2, ncol = 1)
+```
+
+```{r}
+html <- TRUE
+train <- window(prison.gts, end = c(2014, 4))
+test <- window(prison.gts, start = 2015)
+
+fcsts.opt <- forecast(train,
+  h = 8, method = "comb",
+  weights = "wls", fmethod = "ets"
+)
+fcsts.bu <- forecast(train,
+  h = 8, method = "bu",
+  fmethod = "ets"
+)
+tab <- matrix(NA, ncol = 4, nrow = 6)
+rownames(tab) <- c("전체", "주", "법적 상태", "성별", "밑바닥", "모든 시계열")
+colnames(tab) <- c("MAPE", "MASE", "MAPE", "MASE")
+tab[1, ] <- c(
+  accuracy(fcsts.bu, test, levels = 0)[c("MAPE", "MASE"), "Total"],
+  accuracy(fcsts.opt, test, levels = 0)[c("MAPE", "MASE"), "Total"]
+)
+j <- 2
+for (i in c(1:3, 7)) {
+  tab[j, ] <- c(
+    mean(accuracy(fcsts.bu, test, levels = i)["MAPE", ]),
+    mean(accuracy(fcsts.bu, test, levels = i)["MASE", ]),
+    mean(accuracy(fcsts.opt, test, levels = i)["MAPE", ]),
+    mean(accuracy(fcsts.opt, test, levels = i)["MASE", ])
+  )
+  j <- j + 1
+}
+tab[6, ] <- c(
+  mean(accuracy(fcsts.bu, test)["MAPE", ]),
+  mean(accuracy(fcsts.bu, test)["MASE", ]),
+  mean(accuracy(fcsts.opt, test)["MAPE", ]),
+  mean(accuracy(fcsts.opt, test)["MASE", ])
+)
+out <- knitr::kable(tab,
+  digits = 2, booktabs = TRUE,
+  format = ifelse(html, "html", "latex"),
+  caption = "서로 다른 시계열 그룹에 대한 호주 수감 인구 예측값의 정확도."
+) %>%
+  kableExtra::add_header_above(c(" " = 1, "Bottom-up" = 2, "Optimal" = 2))
+if (!html) {
+  out <- gsub("\\[t\\]", "\\[b\\]", out)
+}
+out
+```
+
+## 10.8 연습문제
