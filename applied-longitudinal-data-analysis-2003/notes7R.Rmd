@@ -1,0 +1,102 @@
+---
+title: "note7R"
+output: html_notebook
+---
+
+```{r}
+options(paged.print = FALSE)
+```
+
+```{r}
+opposites <- read.table("https://stats.idre.ucla.edu/stat/r/examples/alda/data/opposites_pp.txt", header = TRUE, sep = ",")
+head(opposites)
+```
+
+```{r}
+library(nlme)
+library(ggplot2)
+```
+
+```{r,}
+opposites |>
+  ggplot(aes(wave)) +
+  geom_point(aes(y = opp)) +
+  geom_line(aes(y = cog), color = "red") +
+  facet_wrap(~id) +
+  theme(panel.grid = element_blank())
+```
+
+```{r}
+opp.reml <- lme(opp ~ time * ccog, opposites, random = ~ time | id)
+summary(opp.reml)
+```
+
+```{r}
+attach(opposites)
+corandcov <- function(glsob, cov = T, ...) {
+  corm <- corMatrix(glsob$modelStruct$corStruct)[[5]]
+  print(corm)
+  varstruct <- print(glsob$modelStruct$varStruct)
+  varests <- coef(varstruct, uncons = F, allCoef = T)
+  covm <- corm * glsob$sigma^2 * t(t(varests)) %*% t(varests)
+  return(covm)
+}
+```
+
+```{r}
+unstruct <- gls(opp ~ time * ccog, opposites,
+  correlation = corSymm(form = ~ 1 | id),
+  weights = varIdent(form = ~ 1 | wave),
+  method = "REML"
+)
+summary(unstruct)
+```
+
+```{r}
+corandcov(unstruct)
+```
+
+```{r}
+comsym <- gls(opp ~ time * ccog, opposites, correlation = corCompSymm(, form = ~ 1 | id), method = "REML")
+cc <- corMatrix(comsym$modelStruct$corStruct)[[5]]
+print(cc)
+```
+
+```{r}
+cc * comsym$sigma^2
+```
+
+```{r}
+hetercom <- gls(opp ~ time * ccog, opposites, correlation = corCompSymm(, form = ~ 1 | id), weights = varIdent(form = ~ 1 | wave), method = "REML")
+corandcov(hetercom)
+```
+
+```{r}
+auto1 <- gls(opp ~ time * ccog, opposites, correlation = corAR1(, form = ~ 1 | id), method = "REML")
+cc <- corMatrix(auto1$modelStruct$corStruct)[[5]]
+print(cc)
+```
+
+```{r}
+cc * auto1$sigma^2
+```
+
+```{r}
+toep <- gls(opp ~ time * ccog, opposites, correlation = corARMA(, form = ~ 1 | id, p = 3, q = 0), method = "REML")
+cc <- corMatrix(toep$modelStruct$corStruct)[[5]]
+print(cc)
+```
+
+```{r}
+cc * toep$sigma^2
+```
+
+```{r}
+# Standard error covariance structure
+summary(lme(opp ~ time * ccog, opposites, random = ~ time | id))
+```
+
+```{r}
+# Unstructured error covariance structure
+summary(gls(opp ~ time * ccog, opposites, correlation = corSymm(form = ~ 1 | id), weights = varIdent(form = ~ 1 | wave), method = "REML"))
+```
