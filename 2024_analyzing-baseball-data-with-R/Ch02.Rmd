@@ -1,0 +1,205 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+# remotes::install_github("beanumber/abdwr3edata")
+library(abdwr3edata)
+```
+
+
+```{r}
+spahn |> 
+  slice(1:3) |> 
+  select(1:10)
+```
+
+
+```{r}
+spahn |> 
+  select(Age, W, L, ERA)
+```
+
+```{r}
+spahn |> 
+  summarize(
+    LO = min(ERA),
+    QL = quantile(ERA, .25),
+    QU = quantile(ERA, .75),
+    M = median(ERA),
+    HI = max(ERA),
+    LO = min(ERA),
+  )
+```
+
+
+```{r}
+spahn |> 
+  filter(ERA == min(ERA)) |> 
+  select(Age)
+```
+
+```{r}
+spahn <- 
+  spahn |> 
+  mutate(FIP = (13 * HR + 3 * BB - 2 * SO) / IP)
+```
+
+
+```{r}
+spahn |> 
+  arrange(FIP) |> 
+  select(Year, Age, W, L, ERA, FIP) |> 
+  slice(1:6)
+```
+
+```{r}
+spahn |> 
+  filter(Tm == "BSN" | Tm == "MLN") |> 
+  group_by(Tm) |>
+  summarize(
+    mean_W.L = mean(W.L, na.rm = TRUE),
+    mean_ERA = mean(ERA),
+    mean_WHIP = mean(WHIP),
+    mean_FIP = mean(FIP),
+  )
+```
+
+
+```{r}
+batting <- bind_rows(NLbatting, ALbatting)
+```
+
+
+```{r}
+NL <- inner_join(NLbatting, NLpitching, by = "Tm")
+```
+
+
+```{r}
+NL
+```
+
+```{r}
+NL_150 <- NLbatting |> 
+  filter(HR > 150)
+```
+
+
+```{r}
+spahn |>
+  filter(Year %in% 1946:1952) |> 
+  mutate(win_pct = W / (W + L)) |> 
+  ggplot(aes(Age, win_pct)) +
+  geom_point()
+```
+
+
+###  2.10.1
+
+```{r}
+hr_leader <- function(data) {
+  data |> 
+    group_by(playerID) |> 
+    summarize(HR = sum(HR)) |> 
+    arrange(desc(HR)) |> 
+    slice(1)
+}
+```
+
+```{r}
+Batting_decate <- batting |> 
+  mutate(decade = 10 * floor(yearID / 10)) |> 
+  group_by(decade)
+```
+
+```{r}
+library(Lahman)
+```
+
+```{r}
+Batting_60 <-
+  Batting |> 
+  filter(yearID %in% 1960:1969)
+Batting_60
+```
+
+```{r}
+hr_60 <- Batting_60 |> 
+  group_by(playerID) |> 
+  summarize(HR = sum(HR))
+hr_60
+```
+
+
+
+```{r}
+hr_60 |> 
+  arrange(desc(HR)) |> 
+  slice(1:4)
+```
+
+
+
+
+```{r}
+Batting_decade <- Batting |> 
+  mutate(decade = 10 * floor(yearID / 10)) |> 
+  group_by(decade)
+```
+
+
+```{r}
+decades <-
+  Batting_decade |> 
+  group_keys() |> 
+  pull(decade)
+decades
+```
+
+
+```{r}
+Batting_decade |> 
+  group_split() |> 
+  map(hr_leader) |> 
+  set_names(decades) |> 
+  bind_rows(.id = "decade")
+```
+
+
+```{r}
+hr_leader
+```
+
+```{r}
+Batting_decade |> 
+  ungroup() |> 
+  nest(.by = decade) |> 
+  mutate(hr = map(data, hr_leader)) |> 
+  unnest(hr) |> 
+  select(-data) |> 
+  arrange(decade)
+```
+
+
+
+```{r}
+Batting |> 
+  group_by(playerID) |> 
+  summarize(
+    tAB = sum(AB, na.rm = TRUE),
+    tHR = sum(HR, na.rm = TRUE),
+    tSO = sum(SO, na.rm = TRUE)
+  ) |> 
+  filter(tAB >= 5000) |> 
+  ggplot(aes(tHR / tAB, tSO / tAB)) +
+  geom_point() +
+  geom_smooth()
+```
+
+
