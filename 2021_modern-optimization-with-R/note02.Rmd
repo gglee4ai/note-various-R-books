@@ -1,0 +1,215 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+x <- c(1.1, 2.3, -1, 4, 2e-2)
+plot(x)
+```
+
+```{r}
+m <- matrix(ncol = 3, nrow = 2)
+m[, ] <- 0
+m
+```
+
+```{r}
+### functions.R file ###
+# compute the bag factory profit for x:
+# x - a vector of prices
+profit <- function(x) # x - a vector of prices
+{
+  x <- round(x, digits = 0) # convert x into integer
+  s <- sales(x) # get the expected sales
+  c <- cost(s) # get the expected cost
+  profit <- sum(s * x - c) # compute the profit
+  return(profit)
+  # local variables x, s, c and profit are lost from here
+}
+# compute the cost for producing units:
+# units - number of units produced
+# A - fixed cost, cpu - cost per unit
+cost <- function(units, A = 100, cpu = 35 - 5 * (1:length(units))) {
+  return(A + cpu * units)
+}
+# compute the estimated sales for x:
+# x - a vector of prices, m - marketing effort
+# A, B, C - constants of the estimated function
+sales <- function(
+    x, A = 1000, B = 200, C = 141,
+    m = seq(2, length.out = length(x), by = -0.25)) {
+  return(round(m * (A / log(x + B) - C), digits = 0))
+}
+# example of a simple recursive function:
+fact <- function(x = 0) # x - integer number
+{
+  if (x == 0) {
+    return(1)
+  } else {
+    return(x * fact(x - 1))
+  }
+}
+```
+
+```{r}
+cat("class of profit is:", class(profit), "\n") # function
+x <- c(414.1, 404.2, 408.3, 413.2, 395.0)
+y <- profit(x)
+cat("maximum profit:", y, "\n")
+
+cat("x is not changed:", x, "\n")
+# x is not changed: 414.1 404.2 408.3 413.2 395
+cat("cost(x=", x, ")=", cost(x), "\n")
+# cost(x= 414.1 404.2 408.3 413.2 395 )= 12523 10205 8266 6298 4050
+cat("sales(x=", x, ")=", sales(round(x)), "\n")
+# sales(x= 414.1 404.2 408.3 413.2 395 )= 30 27 23 19 16
+x <- c(414, 404) # sales for 2 bags:
+cat("sales(x=", x, ")=", sales(x), "\n")
+# sales(x= 414 404 )= 30 27
+cat("sales(x,A=1000,m=c(2,1.75))=", sales(x, 1000, m = c(2, 1.75)), "\n")
+# sales(x,A=1000,m=c(2,1.75))= 30 27
+# show 3! :
+x <- 3
+cat("fact(", x, ")=", fact(x), "\n")
+# fact( 3 )= 6
+```
+
+```{r}
+x <- 1:5
+sapply(x, fact)
+```
+
+```{r}
+m <- matrix(ncol = 5, nrow = 2)
+m[1, ] <- c(1, 1, 1, 1, 1)
+m[2, ] <- c(414, 404, 408, 413, 395)
+
+apply(m, 1, profit)
+```
+
+```{r}
+# library(RCurl)
+URL <- "http://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-white.csv"
+wine <- RCurl::getURL(URL)
+write(wine, file = "winequality-white.csv")
+w <- read.table("winequality-white.csv", header = TRUE, sep = ";")
+w
+```
+
+```{r}
+#| fig-asp: 1
+#|
+plot(w[c("alcohol", "quality")])
+```
+
+```{r}
+sumbinint <- function(x) # sum of bits of an integer
+{
+  return(sum(as.numeric(intToBits(x))))
+}
+
+sumbits <- function(x) {
+  return(sapply(x, sumbinint))
+}
+
+D <- 8
+x <- 0:(2^D - 1) # x is the search space (integer representation)
+y <- sumbits(x)
+plot(x, y, type = "l", ylab = "evaluation function", xlab = "search space (x)", lwd = 2)
+
+pmax <- c(x[which.max(y)], max(y)) # maximum point coordinates
+
+points(pmax[1], pmax[2], pch = 19, lwd = 2) # plot maximum point
+legend("topleft", "optimum", pch = 19, lwd = 2) # add a legend
+# dev.off() # close the device
+# This example introduces the functions: intToBits, which converts an integer
+```
+
+```{r}
+# load the libraries:
+library(parallel)
+library(tictoc)
+cl <- makeCluster(getOption("cl.cores", 2)) # set 2 cores
+mysleep <- function(s) {
+  Sys.sleep(s)
+} # my sleep function
+x <- c(2, 2) # in seconds
+tic("single execution:") # set the timer
+lapply(x, mysleep) # execute serial cycle
+toc() # measure time elapsed
+tic("parallel execution:") # set the timer
+parLapply(cl, x, mysleep) # execute parallel cycle
+toc() # measure time elapsed
+stopCluster(cl) # stop the cluster
+```
+
+```{r}
+# load the libraries:
+library(parallel)
+library(tictoc)
+n <- detectCores() # attempt to detect the CPU cores
+cat("Set the cluster with", n, "cores.\n")
+cl <- makeCluster(n) # set the cores
+V <- vector("list", n)
+set.seed(123) # set for replicability
+s <- sample(1:100000000, n) # variable sizes
+for (i in 1:n) V[[i]] <- 1:s[i] # sequence
+# serial execution:
+tic("serial execution")
+lapply(V, mad)
+toc()
+# parallel execution:
+tic("parallel execution:")
+parLapply(cl, V, mad) # execute parallel cycle
+toc()
+
+# load balancing parallel execution:
+tic("LB parallel execution:")
+# load balancing parallel version:
+parLapplyLB(cl, V, mad)
+toc()
+stopCluster(cl) # stop the cluster
+```
+
+```{r}
+# app.R file ###
+library(shiny) # load the package
+# User Interface (UI): with 2 inputs and 1 output
+ui <- fluidPage( # begin fluidPage
+  titlePanel("demoApp"), # title of the panel
+  sidebarLayout( # sidebar with input and outputs
+    sidebarPanel( # panel for inputs
+      selectInput("var", # input: 3 character choices
+        label = "Choose a variable",
+        choices = c("pH", "alcohol", "quality"),
+        selected = "pH" # default choice
+      ),
+      sliderInput( # input: numeric selection
+        inputId = "bins",
+        label = "number of bins:",
+        min = 2, # minimum value
+        max = 30, # maximum value
+        value = 10 # default value
+      )
+    ), # end sidebarPanel
+    mainPanel( # panel for outputs
+      plotOutput(outputId = "distPlot")
+    )
+  ) # end sidebar
+) # end fluidPage
+# Server function:
+server <- function(input, output) {
+  output$distPlot <- renderPlot({
+    x <- w[, input$var] # select variable from w
+    # draw the histogram with the specified number of bins
+    text <- paste("Histogram of", input$var) # histogram title
+    hist(x, breaks = input$bins, col = "gray", main = text)
+  })
+}
+# load the wine data and create object w
+file <- "https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-white.csv"
+w <- read.table(file, sep = ";", heade = TRUE)
+# call to shinyApp
+# shinyApp(ui = ui, server = server)
+```
