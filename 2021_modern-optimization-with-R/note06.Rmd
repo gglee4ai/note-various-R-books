@@ -1,0 +1,143 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+### mo-tasks.R file ###
+
+# binary multi-optimization goal:
+sumbin <- function(x) (sum(x))
+intbin <- function(x) sum(2^(which(rev(x == 1)) - 1))
+maxsin <- function(x) # max sin (explained in Chapter 3)
+{
+  D <- length(x)
+  x <- intbin(x)
+  return(sin(pi * (as.numeric(x)) / (2^D)))
+}
+
+# integer multi-optimization goal:
+profit <- function(x) # x - a vector of prices
+{
+  x <- round(x, digits = 0) # convert x into integer
+  s <- sales(x) # get the expected sales
+  c <- cost(s) # get the expected cost
+  profit <- sum(s * x - c) # compute the profit
+  return(profit)
+}
+cost <- function(units, A = 100, cpu = 35 - 5 * (1:length(units))) {
+  return(A + cpu * units)
+}
+sales <- function(x, A = 1000, B = 200, C = 141,
+                  m = seq(2, length.out = length(x), by = -0.25)) {
+  return(round(m * (A / log(x + B) - C), digits = 0))
+}
+produced <- function(x) sum(sales(round(x)))
+
+# real value FES1 benchmark:
+fes1 <- function(x) {
+  D <- length(x)
+  f1 <- 0
+  f2 <- 0
+  for (i in 1:D)
+  {
+    f1 <- f1 + abs(x[i] - exp((i / D)^2) / 3)^0.5
+    f2 <- f2 + (x[i] - 0.5 * cos(10 * pi / D) - 0.5)^2
+  }
+  return(c(f1, f2))
+}
+```
+
+```{r}
+### wf-test.R file ###
+
+# source("MO-tasks.R") # load multi-optimization tasks
+library(genalg) # load genalg package
+
+set.seed(12345) # set for replicability
+
+step <- 5 # number of weight combinations
+w <- matrix(ncol = 2, nrow = step) # weight combinations
+w[, 1] <- seq(1, 0, length.out = step)
+w[, 2] <- 1 - w[, 1] # complementary weights (sum(w[i,])==1)
+
+print("Weight combinations:")
+print(w)
+
+# --- binary task:
+D <- 8 # 8 bits
+# weighted evaluation function: W is a global vector
+weval <- function(x) {
+  return(W[1] * sumbin(x) + W[2] * maxsin(x))
+}
+
+cat("binary task:\n")
+for (i in 1:step)
+{
+  W <- -w[i, ] # rbga.bin minimization goal: max. f1 and max. f2
+  G <- rbga.bin(
+    size = D, popSize = 12, iters = 100, zeroToOneRatio = 1,
+    evalFunc = weval, elitism = 1
+  )
+  b <- G$population[which.min(G$evaluations), ] # best individual
+  cat("w", i, "best:", b)
+  cat(" f=(", sumbin(b), ",", round(maxsin(b), 2), ")", "\n", sep = "")
+}
+```
+
+```{r}
+# --- integer task:
+D <- 5 # 5 bag prices
+# weighted evaluation function: W is a global vector
+weval <- function(x) {
+  return(W[1] * profit(x) + W[2] * produced(x))
+}
+
+cat("integer task:\n")
+res <- matrix(nrow = nrow(w), ncol = ncol(w)) # for CSV files
+for (i in 1:step)
+{
+  W <- c(-w[i, 1], w[i, 2]) # rbga min. goal: max. f1 and min. f2
+  G <- rbga(
+    evalFunc = weval, stringMin = rep(1, D), stringMax = rep(1000, D),
+    popSize = 20, iters = 100
+  )
+  b <- round(G$population[which.min(G$evaluations), ]) # best
+  cat("w", i, "best:", b)
+  cat(" f=(", profit(b), ",", produced(b), ")", "\n", sep = "")
+  res[i, ] <- c(profit(b), produced(b))
+}
+# write.table(res, "wf-bag.csv",
+#   row.names = FALSE, col.names = FALSE, sep = " "
+# )
+res
+```
+
+```{r}
+# --- real value task:
+D <- 8 # dimension
+# weighted evaluation function: W is a global vector
+weval <- function(x) {
+  return(sum(W * fes1(x)))
+}
+
+cat("real value task:\n")
+for (i in 1:step)
+{
+  W <- w[i, ] # rbga minimization goal
+  G <- rbga(
+    evalFunc = weval, stringMin = rep(0, D), stringMax = rep(1, D),
+    popSize = 20, iters = 100
+  )
+  b <- G$population[which.min(G$evaluations), ] # best solution
+  cat("w", i, "best:", round(b, 2))
+  cat(" f=(", round(fes1(b)[1], 2), ",", round(fes1(b)[2], 2), ")", "\n", sep = "")
+  res[i, ] <- fes1(b)
+}
+# write.table(res, "wf-fes1.csv",
+#   row.names = FALSE, col.names = FALSE, sep = " "
+# )
+res
+```
+
+## 6.4 Lexicographic Approach
