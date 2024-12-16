@@ -1,4 +1,5 @@
 # My gitignore
+pop_*
 note-applied-longitudinal-data-analysis-2003/fits/fit*.rds
 *_temp
 # *.RData

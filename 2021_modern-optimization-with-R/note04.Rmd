@@ -1,0 +1,705 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+### hill.R file ###
+
+# pure hill climbing:
+#    par - initial solution
+#    fn - evaluation function
+#    change - function to generate the next candidate
+#    lower - vector with lowest values for each dimension
+#    upper - vector with highest values for each dimension
+#    control - list with stopping and monitoring method:
+#       $maxit - maximum number of iterations
+#       $REPORT - frequency of monitoring information
+#       $digits - (optional) round digits for reporting
+#    type - "min" or "max"
+#    ... - extra parameters for fn
+hclimbing <- function(par, fn, change, lower, upper, control,
+                      type = "min", ...) {
+  fpar <- fn(par, ...)
+  for (i in 1:control$maxit)
+  {
+    par1 <- change(par, lower, upper)
+    fpar1 <- fn(par1, ...)
+    if (control$REPORT > 0 && (i == 1 || i %% control$REPORT == 0)) {
+      report_iter(i, par, fpar, par1, fpar1, control)
+    }
+    b <- best(par, fpar, par1, fpar1, type) # select best
+    par <- b$par
+    fpar <- b$fpar
+  }
+  if (control$REPORT >= 1) {
+    report_iter("best:", par, fpar, control = control)
+  }
+  return(list(sol = par, eval = fpar))
+}
+
+# report iteration details:
+# i, par, fpar, par1 and fpar1 are set in the search method
+# control - list with optional number of digits: $digits
+report_iter <- function(i, par, fpar, par1 = NULL, fpar1 = NULL, control) {
+  if (is.null(control$digits)) {
+    digits <- 2
+  } # default value
+  else {
+    digits <- control$digits
+  }
+  if (i == "best:") {
+    cat(i, round(par, digits = digits), "f:", round(fpar, digits = digits), "\n")
+  } else {
+    cat(
+      "i:", i, "s:", round(par, digits = digits), "f:", round(fpar, digits = digits),
+      "s'", round(par1, digits = digits), "f:", round(fpar1, digits = digits), "\n"
+    )
+  }
+}
+
+# slight random change of vector par:
+#    par - initial solution
+#    lower - vector with lowest values for each dimension
+#    upper - vector with highest values for each dimension
+#    dist - random distribution function
+#    round - use integer (TRUE) or continuous (FALSE) search
+#    ... - extra parameters for dist
+#    examples: dist=rnorm, mean=0, sd=1; dist=runif, min=0,max=1
+hchange <- function(par, lower, upper, dist = rnorm, round = TRUE, ...) {
+  D <- length(par) # dimension
+  step <- dist(D, ...) # slight step
+  if (round) step <- round(step)
+  par1 <- par + step
+  # return par1 within [lower,upper]:
+  return(ifelse(par1 < lower, lower, ifelse(par1 > upper, upper, par1)))
+}
+
+# return best solution and its evaluation function value
+#    par - first solution
+#    fpar - first solution evaluation
+#    par2 - second solution
+#    fpar2 - second solution evaluation
+#    type - "min" or "max"
+#    fn - evaluation function
+#    ... - extra parameters for fn
+best <- function(par, fpar, par2, fpar2, type = "min", ...) {
+  if ((type == "min" && fpar2 < fpar) ||
+    (type == "max" && fpar2 > fpar)) {
+    par <- par2
+    fpar <- fpar2
+  }
+  return(list(par = par, fpar = fpar))
+}
+```
+
+```{r}
+### sumbits-hill.R file ###
+
+# sum a raw binary object x (evaluation function):
+sumbin <- function(x) sum(x)
+
+# hill climbing for sum of bits, one run:
+D <- 8 # dimension
+s <- rep(0, D) # c(0,0,0,0,...)
+C <- list(maxit = 10, REPORT = 1) # maximum of 10 iterations
+ichange <- function(par, lower, upper) # integer change
+{
+  hchange(par, lower, upper, rnorm, mean = 0, sd = 1)
+}
+
+hclimbing(s, sumbin,
+  change = ichange, lower = rep(0, D), upper = rep(1, D),
+  control = C, type = "max"
+)
+```
+
+```{r}
+setwd("Rcode")
+source("functions.R")
+
+# hill climbing for all bag prices, one run:
+D <- 5
+C <- list(maxit = 100000, REPORT = 10000) # 10000 iterations
+s <- sample(1:1000, D, replace = TRUE) # initial search
+ichange <- function(par, lower, upper) # integer value change
+{
+  hchange(par, lower, upper, rnorm, mean = 0, sd = 1)
+}
+hclimbing(s, profit,
+  change = ichange, lower = rep(1, D),
+  upper = rep(1000, D), control = C, type = "max"
+)
+```
+
+```{r}
+# hill climbing for sphere, one run:
+sphere <- function(x) sum(x^2)
+D <- 2
+C <- list(maxit = 100000, REPORT = 10000, digits = 3)
+rchange <- function(par, lower, upper) { # real value change
+  hchange(par, lower, upper, rnorm, mean = 0, sd = 0.5, round = FALSE)
+}
+
+s <- runif(D, -5.2, 5.2) # initial search
+hclimbing(s, sphere,
+  change = rchange, lower = rep(-5.2, D),
+  upper = rep(5.2, D), control = C, type = "min"
+)
+```
+
+```{r}
+### hill2.R file ###
+
+# steepest ascent hill climbing:
+#    par - initial solution
+#    fn - evaluation function
+#    change - function to generate the next candidate
+#    lower - vector with lowest values for each dimension
+#    upper - vector with highest values for each dimension
+#    control - list with stopping and monitoring method:
+#       $N - number of change searches (steepest ascent)
+#       $maxit - maximum number of iterations
+#       $REPORT - frequency of monitoring information
+#       $digits - (optional) round digits for reporting
+#    type - "min" or "max"
+#    ... - extra parameters for fn
+sa_hclimbing <- function(par, fn, change, lower, upper, control,
+                         type = "min", ...) {
+  fpar <- fn(par, ...)
+  for (i in 1:control$maxit)
+  {
+    # first change
+    par1 <- change(par, lower, upper)
+    fpar1 <- fn(par1, ...)
+    if (control$N > 1) # steepest ascent cycle
+      {
+        for (j in 1:(control$N - 1))
+        { # random search for better par1 solutions:
+          par2 <- change(par, lower, upper)
+          fpar2 <- fn(par2, ...)
+          b <- best(par1, fpar1, par2, fpar2, type)
+          par1 <- b$par
+          fpar1 <- b$fpar # update change
+        }
+      }
+    if (control$REPORT > 0 && (i == 1 || i %% control$REPORT == 0)) {
+      report_iter(i, par, fpar, par1, fpar1, control)
+    }
+    b <- best(par, fpar, par1, fpar1, type) # update best solution
+    par <- b$par
+    fpar <- b$fpar
+  }
+  if (control$REPORT >= 1) {
+    report_iter("best:", par, fpar, control = control)
+  }
+  return(list(sol = par, eval = fpar))
+}
+```
+
+```{r}
+# stochastic hill climbing:
+#    par - initial solution
+#    fn - evaluation function
+#    change - function to generate the next candidate
+#    lower - vector with lowest values for each dimension
+#    upper - vector with highest values for each dimension
+#    control - list with stopping and monitoring method:
+#       $P - Probability (in [0,1]) for accepting solutions
+#       $maxit - maximum number of iterations
+#       $REPORT - frequency of monitoring information
+#       $digits - (optional) round digits for reporting
+#    type - "min" or "max"
+#    ... - extra parameters for fn
+st_hclimbing <- function(par, fn, change, lower, upper, control,
+                         type = "min", ...) {
+  fpar <- fn(par, ...)
+  b <- list(par = par, fpar = fpar) # set initial best
+  for (i in 1:control$maxit)
+  {
+    par1 <- change(par, lower, upper)
+    fpar1 <- fn(par1, ...)
+    if (control$REPORT > 0 && (i == 1 || i %% control$REPORT == 0)) {
+      report_iter(i, par, fpar, par1, fpar1, control)
+    }
+
+    b <- best(b$par, b$fpar, par1, fpar1, type) # memorize best
+
+    x <- runif(1) # random between [0,1]
+    if (x < control$P) # accept new solution
+      {
+        par <- par1
+        fpar <- fpar1
+      } else # select best between par and par1
+    {
+      b1 <- best(par, fpar, par1, fpar1, type)
+      par <- b1$par
+      fpar <- b1$fpar # update par
+    }
+  }
+  par <- b$par
+  fpar <- b$fpar # set par to best
+  if (control$REPORT >= 1) {
+    report_iter("best:", par, fpar, control = control)
+  }
+  return(list(sol = par, eval = fpar))
+}
+```
+
+```{r}
+### maxsin-hill.R file ###
+
+intbin <- function(x) # convert binary to integer
+{
+  sum(2^(which(rev(x == 1)) - 1))
+} # explained in Chapter 3
+# max sin of binary raw object x (evaluation function):
+maxsin <- function(x, Dim) sin(pi * (intbin(x)) / (2^Dim))
+
+# hill climbing variants for max sin:
+D <- 8 # dimension
+# initial solution:
+s <- rep(0, D) # c(0,0,0,0,...)
+C <- list(maxit = 10, REPORT = 1) # maximum of 10 iterations
+lower <- rep(0, D)
+upper <- rep(1, D)
+ichange <- function(par, lower, upper) # integer change
+{
+  hchange(par, lower, upper, rnorm, mean = 0, sd = 1)
+}
+```
+
+```{r}
+set.seed(123) # set for replicability
+
+# steepest ascent with 5 searches in each iteration:
+C1 <- C
+C1$N <- 5
+cat("steepest ascent: N=", C1$N, "\n")
+sa_hclimbing(s, maxsin,
+  change = ichange, lower = lower, upper = upper,
+  control = C1, type = "max", Dim = D
+) # Dim used by maxsin
+```
+
+```{r}
+set.seed(123) # set for replicability
+# low probability schochastic hill climbing:
+C2 <- C
+C2$P <- 0.2
+C2$maxit <- 100
+cat("stochastic hill climbing: P=", C2$P, "\n")
+st_hclimbing(s, maxsin,
+  change = ichange, lower = lower, upper = upper,
+  control = C2, type = "max", Dim = D
+) # Dim used by maxsin
+```
+
+```{r}
+### sumbits-sann.R file ###
+# source("hill.R") # get hchange function
+
+# sum a raw binary object x (evaluation function):
+minsumbin <- function(x) (length(x) - sum(x)) # optim only minimizes!
+
+# SANN for sum of bits, one run:
+D <- 8 # dimension
+s <- rep(0, D) # c(0,0,0,0,...)
+C <- list(maxit = 10, temp = 10, tmax = 1, trace = TRUE, REPORT = 1)
+bchange <- function(par) { # binary change
+
+  D <- length(par)
+  hchange(par, lower = rep(0, D), upper = rep(1, D), rnorm, mean = 0, sd = 1)
+}
+s <- optim(s, minsumbin, gr = bchange, method = "SANN", control = C)
+cat("best:", s$par, "f:", s$value, "(max: fs:", sum(s$par), ")\n")
+```
+
+```{r}
+### bs-sann.R file ###
+setwd("Rcode")
+source("hill.R") # load the hchange method
+source("functions.R") # load the profit function
+eval <- function(x) -profit(x) # optim minimizes!
+
+# hill climbing for all bag prices, one run:
+D <- 5
+C <- list(maxit = 1000000, temp = 1000, trace = TRUE, REPORT = 10000)
+s <- sample(1:1000, D, replace = TRUE) # initial search
+ichange <- function(par) # integer value change
+{
+  D <- length(par)
+  hchange(par, lower = rep(1, D), upper = rep(1000, D), rnorm, mean = 0, sd = 1)
+}
+s <- optim(s, eval, gr = ichange, method = "SANN", control = C)
+cat("best:", s$par, "profit:", abs(s$value), "\n")
+```
+
+```{r}
+# hill climbing for sphere, one run:
+sphere <- function(x) sum(x^2)
+D <- 2
+C <- list(maxit = 100000, temp = 1000, trace = TRUE, REPORT = 10000)
+
+s <- runif(D, -5.2, 5.2) # initial search
+# SANN with default change (gr) function:
+s <- optim(s, sphere, method = "SANN", control = C)
+cat("best:", s$par, "f:", s$value, "\n")
+```
+
+```{r}
+setwd("Rcode")
+### rastrigin-sann.R file ###
+
+# execute 3 simulation annealing optimizations for rastrigin D=30
+
+library(NMOF) # load NMOF
+library(GenSA) # load GenSA
+
+source("hill.R") # get hchange
+
+# real value rastrigin function with a dimension of 30:
+rastrigin <- function(x) 10 * length(x) + sum(x^2 - 10 * cos(2 * pi * x))
+D <- 30
+
+set.seed(123) # set for replicability
+
+# common setup for the 3 executions:
+lower <- rep(-5.2, D)
+upper <- rep(5.2, D) # lower and upper bounds
+par <- runif(D, lower[1], upper[1]) # initial search point
+maxit <- 10000 # maximum number of iterations
+temp <- 1000 # initial temperature
+repit <- 2000 # report every repit iterations
+```
+
+```{r}
+# control argument for optim:
+C1 <- list(maxit = maxit, temp = temp, trace = TRUE, REPORT = repit / 10)
+# change function (gr argument):
+rchange <- function(par) {
+  D <- length(par)
+  # upper and lower are defined globally
+  hchange(par, lower = lower, upper = upper, rnorm, mean = 0, sd = 1)
+}
+cat("SANN optim execution:\n")
+s1 <- optim(par, rastrigin, gr = rchange, method = "SANN", control = C1)
+cat("best:", s1$par, "f:", s1$value, "\n")
+```
+
+```{r}
+# algo configuration:
+algo <- list(nI = maxit, initT = temp, x0 = par, neighbour = rchange, printDetail = repit, storeF = TRUE)
+cat("SAopt optim execution:\n")
+s2 <- SAopt(rastrigin, algo)
+cat("best:", s2$xbest, "f:", s2$OFvalue, "\n")
+```
+
+```{r}
+C3 <- list(maxit = maxit, temperature = temp, verbose = TRUE)
+cat("GenSA optim execution:\n")
+s3 <- GenSA(par, rastrigin, lower = lower, upper = upper, control = C3)
+cat("best:", s3$par, "f:", s3$value, "\n")
+```
+
+```{r}
+C3 <- list(maxit = maxit, temperature = temp, verbose = TRUE)
+cat("GenSA optim execution:\n")
+s3 <- GenSA(par, sphere, lower = lower, upper = upper, control = C3)
+cat("best:", s3$par, "f:", s3$value, "\n")
+```
+
+### 4.4 Tabu Search
+
+```{r}
+### binary-tabu.R file ###
+library(tabuSearch) # load tabuSearch package
+
+# tabu search for sum of bits:
+sumbin <- function(x) (sum(x)) # sum of bits
+D <- 8 # dimension
+s0 <- rep(0, D) # c(0,0,0,0,...)
+
+cat("sum of bits (D=", D, ")\n", sep = "")
+s1 <- tabuSearch(D,
+  iters = 10, objFunc = sumbin, config = s0, neigh = 2,
+  listSize = 4, nRestarts = 1
+)
+b <- which.max(s1$eUtilityKeep) # best index
+cat("best:", s1$configKeep[b, ], "f:", s1$eUtilityKeep[b], "\n")
+```
+
+```{r}
+# tabu search for max sin:
+intbin <- function(x) sum(2^(which(rev(x == 1)) - 1))
+maxsin <- function(x) { # max sin (explained in Chapter 3)
+
+  D <- length(x)
+  x <- intbin(x)
+  return(sin(pi * (as.numeric(x)) / (2^D)))
+}
+D <- 8
+cat("max sin (D=", D, ")\n", sep = "")
+s2 <- tabuSearch(D,
+  iters = 2, objFunc = maxsin, config = s0, neigh = 2,
+  listSize = 4, nRestarts = 1
+)
+b <- which.max(s2$eUtilityKeep) # best index
+cat("best:", s2$configKeep[b, ], "f:", s2$eUtilityKeep[b], "\n")
+```
+
+```{r}
+### bag-tabu.R file ###
+library(tabuSearch) # load tabuSearch package
+# source("functions.R") # load the profit function
+
+# tabu search for bag prices:
+D <- 5 # dimension (number of prices)
+MaxPrice <- 1000
+Dim <- ceiling(log(MaxPrice, 2)) # size of each price (=10)
+size <- D * Dim # total number of bits (=50)
+s0 <- sample(0:1, size, replace = TRUE) # initial search
+
+intbin <- function(x) # convert binary to integer
+{
+  sum(2^(which(rev(x == 1)) - 1))
+} # explained in Chapter 3
+
+bintbin <- function(x) { # convert binary to D prices
+  # note: D and Dim need to be set outside this function
+  s <- vector(length = D)
+  for (i in 1:D) # convert x into s:
+  {
+    ini <- (i - 1) * Dim + 1
+    end <- ini + Dim - 1
+    s[i] <- intbin(x[ini:end])
+  }
+  return(s)
+}
+
+bprofit <- function(x) # profit for binary x
+{
+  s <- bintbin(x)
+  if (sum(s > MaxPrice) > 0) {
+    f <- -Inf
+  } # death penalty
+  else {
+    f <- profit(s)
+  }
+  return(f)
+}
+
+cat("initial:", bintbin(s0), "f:", bprofit(s0), "\n")
+s <- tabuSearch(size, iters = 100, objFunc = bprofit, config = s0, neigh = 4, listSize = 16, nRestarts = 1)
+b <- which.max(s$eUtilityKeep) # best index
+cat("best:", bintbin(s$configKeep[b, ]), "f:", s$eUtilityKeep[b], "\n")
+```
+
+### 4.5 Comparison of Local Search Methods
+
+```{r}
+setwd("Rcode")
+### compare.R file ###
+
+source("hill.R") # get hchange
+source("blind.R") # get fsearch
+source("montecarlo.R") # get mcsearch
+library(rminer) # get meanint
+
+# comparison setup:
+crastrigin <- function(x) { # x is a solution
+  f <- 10 * length(x) + sum(x^2 - 10 * cos(2 * pi * x))
+  # global variables: EV, BEST, F
+  # global assignment code: <<-
+  EV <<- EV + 1 # increase evaluations
+  if (f < BEST) BEST <<- f # update current BEST
+  if (EV <= MAXIT) F[EV] <<- BEST # update BEST for EV
+  return(f)
+}
+```
+
+```{r}
+# experimental comparison setup:
+Runs <- 50
+D <- 20
+MAXIT <- 10000
+lower <- rep(-5.2, D)
+upper <- rep(5.2, D)
+rchange1 <- function(par, lower, upper) { # change for hclimbing
+  hchange(par,
+    lower = lower, upper = upper, rnorm,
+    mean = 0, sd = 0.5, round = FALSE
+  )
+}
+rchange2 <- function(par) { # change for optim
+  hchange(par,
+    lower = lower, upper = upper, rnorm,
+    mean = 0, sd = 0.5, round = FALSE
+  )
+}
+CHILL <- list(maxit = MAXIT, REPORT = 0) # control for hclimbing
+CSANN <- list(maxit = MAXIT, temp = 10, trace = FALSE) # control for SANN
+Methods <- c("Monte Carlo", "hill climbing", "simulated annealing")
+
+# run all optimizations and store results:
+RES <- vector("list", length(Methods)) # all results
+for (m in 1:length(Methods)) {
+  RES[[m]] <- matrix(nrow = MAXIT, ncol = Runs)
+}
+
+for (R in 1:Runs) { # cycle all runs
+  s <- runif(D, -5.2, 5.2) # initial search point
+  EV <- 0
+  BEST <- Inf
+  F <- rep(NA, MAXIT) # reset these global vars.
+  # Monte Carlo:
+  mcsearch(fn = crastrigin, lower = lower, upper = upper, N = MAXIT)
+  RES[[1]][, R] <- F
+  # hill climbing:
+  EV <- 0
+  BEST <- Inf
+  F <- rep(NA, MAXIT)
+  hclimbing(s, crastrigin,
+    change = rchange1, lower = lower,
+    upper = upper, control = CHILL, type = "min"
+  )
+  RES[[2]][, R] <- F
+  # SANN:
+  EV <- 0
+  BEST <- Inf
+  F <- rep(NA, MAXIT)
+  optim(s, crastrigin, method = "SANN", gr = rchange2, control = CSANN)
+  RES[[3]][, R] <- F
+}
+
+# aggregate (average and confidence interval) results:
+AV <- matrix(nrow = MAXIT, ncol = length(Methods))
+CI <- AV
+for (m in 1:length(Methods)) {
+  for (i in 1:MAXIT) {
+    mi <- meanint(RES[[m]][i, ]) # mean and confidence interval
+    AV[i, m] <- mi$mean
+    CI[i, m] <- mi$int
+  }
+}
+```
+
+```{r}
+# show comparative PDF graph:
+
+# plot a nice confidence interval bar:
+#   x are the x-axis points
+#   ylower and yupper are the lower and upper y-axis points
+#   ... means other optional plot parameters (lty, etc.)
+confbar <- function(x, ylower, yupper, K = 100, ...) {
+  segments(x - K, yupper, x + K, ...)
+  segments(x - K, ylower, x + K, ...)
+  segments(x, ylower, x, yupper, ...)
+}
+
+# pdf("comp-rastrigin.pdf", width = 5, height = 5)
+par(mar = c(4.0, 4.0, 0.1, 0.6)) # reduce default plot margin
+MIN <- min(AV - CI)
+MAX <- max(AV + CI)
+# 10.000 are too much points, thus two grids are used
+# to improve clarity:
+g1 <- seq(1, MAXIT, length.out = 1000) # grid for lines
+g2 <- seq(1, MAXIT, length.out = 11) # grid for confbar
+plot(g1, AV[g1, 3],
+  ylim = c(MIN, MAX), type = "l", lwd = 2,
+  ylab = "average best", xlab = "number of evaluations"
+)
+confbar(g2, AV[g2, 3] - CI[g2, 3], AV[g2, 3] + CI[g2, 3])
+lines(g1, AV[g1, 2], lwd = 2, lty = 2)
+confbar(g2, AV[g2, 2] - CI[g2, 2], AV[g2, 2] + CI[g2, 2])
+lines(g1, AV[g1, 1], lwd = 2, lty = 3)
+confbar(g2, AV[g2, 1] - CI[g2, 1], AV[g2, 1] + CI[g2, 1])
+legend("topright", legend = rev(Methods), lwd = 2, lty = 1:3)
+# dev.off() # close the PDF device
+```
+
+### 4.6 Tuning Optimization Parameters
+
+```{r}
+setwd("Rcode")
+getwd()
+### rastrigin-irace.R file ###
+
+# tune SAopt parameter for rastrigin D=30
+
+library(NMOF) # load NMOF
+library(irace) # load irace
+source("hill.R") # get hchange
+
+# real value rastrigin function with a dimension of 30:
+rastrigin <- function(x) 10 * length(x) + sum(x^2 - 10 * cos(2 * pi * x))
+D <- 30
+
+set.seed(123) # set for replicability
+
+# setup rastrigin experiments:
+lower <- rep(-5.2, D)
+upper <- rep(5.2, D) # lower and upper bounds
+par <- runif(D, lower[1], upper[1]) # fixed initial search point
+
+rchange <- function(par) # real change
+{
+  D <- length(par)
+  # upper and lower are defined globally
+  hchange(par, lower = lower, upper = upper, rnorm, mean = 0, sd = 1)
+}
+
+# irace elements: parameters and scenario --------------------
+# 4 parameters for irace: i - integer, r - real value
+parameters.txt <- '
+nT "" i (1, 20)
+nD "" i (1, 4000)
+initT "" r (0.1, 1000.0)
+alpha "" r (0.0, 1.0)
+'
+parameters <- readParameters(text = parameters.txt)
+
+# targetRunner function: call SAopt for an irace configuration
+rastrigin_run <- function(experiment, scenario) {
+  C <- experiment$configuration # get current irace configuration
+  # set algo with the irace configuration values
+  algo <- list(
+    x0 = par, nI = 100, neighbour = rchange, # fixed part
+    printDetail = FALSE, printBar = FALSE, # fixed part
+    nT = C$nT, nD = C$nD, initT = C$initT, alpha = C$alpha
+  ) # irace
+  res <- SAopt(rastrigin, algo) # call SAopt
+  return(list(cost = res$OFvalue)) # output list required by irace
+}
+
+scenario <- list(
+  targetRunner = rastrigin_run,
+  instances = 1, # not used but needs to be defined
+  maxExperiments = 200, # 200 calls to targetRunner
+  logFile = ""
+) # do not create log file
+# ------------------------------------------------------------
+
+# run SAopt with default values:
+cat("default SAopt:\n")
+algo1 <- list(x0 = par, nI = 100, neighbour = rchange, printDetail = FALSE, printBar = FALSE)
+res <- SAopt(rastrigin, algo1) # call SAopt
+cat(" evaluation value:", res$OFvalue, "\n")
+```
+
+```{r}
+# 동작 안됨
+# # run irace:
+# cat("irace SAopt:\n")
+# s=irace(scenario=scenario,parameters=parameters)
+# # show best configurations:
+# configurations.print(s)
+# # get best
+# b=removeConfigurationsMetaData(s[1,])
+# print(b)
+# algo2=list(x0=par,nI=100,neighbour=rchange,
+#            printDetail=FALSE,printBar=FALSE,
+#            nT=b$nT,initT=b$initT,alpha=b$alpha)
+# res=SAopt(rastrigin,algo2) # call SAopt
+# cat(" evaluation value:",res$OFvalue,"\n")
+```

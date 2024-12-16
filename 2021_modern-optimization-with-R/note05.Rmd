@@ -1,0 +1,1269 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+## 5.2 Genetic and Evolutionary Algorithms
+
+```{r}
+### functions.R file ###
+# compute the bag factory profit for x:
+#    x - a vector of prices
+profit <- function(x) # x - a vector of prices
+{
+  x <- round(x, digits = 0) # convert x into integer
+  s <- sales(x) # get the expected sales
+  c <- cost(s) # get the expected cost
+  profit <- sum(s * x - c) # compute the profit
+  return(profit)
+  # local variables x, s, c and profit are lost from here
+}
+
+# compute the cost for producing units:
+#    units - number of units produced
+#    A - fixed cost, cpu - cost per unit
+cost <- function(units, A = 100, cpu = 35 - 5 * (1:length(units))) {
+  return(A + cpu * units)
+}
+
+# compute the estimated sales for x:
+#    x - a vector of prices, m - marketing effort
+#    A, B, C - constants of the estimated function
+sales <- function(x, A = 1000, B = 200, C = 141,
+                  m = seq(2, length.out = length(x), by = -0.25)) {
+  return(round(m * (A / log(x + B) - C), digits = 0))
+}
+
+# example of a simple recursive function:
+fact <- function(x = 0) # x - integer number
+{
+  if (x == 0) {
+    return(1)
+  } else {
+    return(x * fact(x - 1))
+  }
+}
+```
+
+```{r}
+# setwd("Rcode")
+### bag-genalg.R file ###
+library(genalg) # load genalg package
+# source("functions.R") # load the profit function
+### functions.R file ###
+# compute the bag factory profit for x:
+#    x - a vector of prices
+profit=function(x)    # x - a vector of prices
+{ x=round(x,digits=0) # convert x into integer
+  s=sales(x)          # get the expected sales
+  c=cost(s)           # get the expected cost
+  profit=sum(s*x-c)   # compute the profit
+  return(profit) 
+# local variables x, s, c and profit are lost from here
+}
+
+# compute the cost for producing units:
+#    units - number of units produced
+#    A - fixed cost, cpu - cost per unit
+cost=function(units,A=100,cpu=35-5*(1:length(units)))
+{ return(A+cpu*units) }
+
+# compute the estimated sales for x:
+#    x - a vector of prices, m - marketing effort
+#    A, B, C - constants of the estimated function
+sales=function(x,A=1000,B=200,C=141,
+               m=seq(2,length.out=length(x),by=-0.25))
+{ return(round(m*(A/log(x+B)-C),digits=0))}
+
+# example of a simple recursive function:
+fact=function(x=0) # x - integer number 
+{ if(x==0) return(1) else return(x*fact(x-1))}
+
+
+
+# genetic algorithm search for bag prices:
+D <- 5 # dimension (number of prices)
+MaxPrice <- 1000
+Dim <- ceiling(log(MaxPrice, 2)) # size of each price (=10)
+size <- D * Dim # total number of bits (=50)
+intbin <- function(x) # convert binary to integer
+{
+  sum(2^(which(rev(x == 1)) - 1))
+} # explained in Chapter 3
+bintbin <- function(x) # convert binary to D prices
+{ # note: D and Dim need to be set outside this function
+  s <- vector(length = D)
+  for (i in 1:D) # convert x into s:
+  {
+    ini <- (i - 1) * Dim + 1
+    end <- ini + Dim - 1
+    s[i] <- intbin(x[ini:end])
+  }
+  return(s)
+}
+bprofit <- function(x) # profit for binary x
+{
+  s <- bintbin(x)
+  s <- ifelse(s > MaxPrice, MaxPrice, s) # repair!
+  f <- -profit(s) # minimization task!
+  return(f)
+}
+# genetic algorithm execution:
+G <- rbga.bin(size = size, popSize = 50, iters = 1000, zeroToOneRatio = 1, evalFunc = bprofit, elitism = 1)
+# show results:
+b <- which.min(G$evaluations) # best individual
+cat(
+  "best:", bintbin(G$population[b, ]), "f:", -G$evaluations[b],
+  "\n"
+)
+```
+
+```{r}
+summary(G, echo = TRUE) # same as summary.rbga
+```
+
+```{r}
+# pdf("genalg1.pdf") # personalized plot of G results
+plot(-G$best, type = "l", lwd = 2, ylab = "profit", xlab = "generations")
+lines(-G$mean, lty = 2, lwd = 2)
+legend("bottomright", c("best", "mean"), lty = 1:2, lwd = 2)
+```
+
+```{r}
+par(pty = "s")
+### sphere-genalg.R file ###
+library(genalg) # load genalg
+
+# evolutionary algorithm for sphere:
+sphere <- function(x) sum(x^2)
+D <- 2
+monitor <- function(obj) {
+  if (i == 1) {
+    plot(obj$population,
+      xlim = c(-5.2, 5.2), ylim = c(-5.2, 5.2),
+      xlab = "x1", ylab = "x2", type = "p", pch = 16,
+      col = gray(1 - i / maxit)
+    )
+  } else if (i %% K == 0) { # add points to the plot
+    points(obj$population, pch = 16, col = gray(1 - i / maxit))
+  }
+  i <<- i + 1 # global update
+}
+
+maxit <- 100
+K <- 5 # show population values every K generations
+i <- 1 # initial generation
+
+# evolutionary algorithm execution:
+# pdf("genalg2.pdf", width = 5, height = 5)
+set.seed(12345) # set for replicability
+E <- rbga(rep(-5.2, D), rep(5.2, D),
+  popSize = 5, iters = maxit,
+  monitorFunc = monitor, evalFunc = sphere
+)
+```
+
+```{r}
+b <- which.min(E$evaluations) # best individual
+cat("best:", E$population[b, ], "f:", E$evaluations[b], "\n")
+# dev.off()
+```
+
+```{r}
+### maxsin-ga.R ###
+
+library(genalg) # load rba.bin
+library(ecr) # load ecr
+library(GA) # load GA
+library(NMOF) # load GAopt
+
+# maxsin task:
+intbin <- function(x) sum(2^(which(rev(x == 1)) - 1))
+maxsin <- function(x) sinpi(intbin(x) / (2^D)) # maximization goal
+maxsin2 <- function(x) -maxsin(x) # minimization goal
+D <- 20 # number of dimensions
+
+# GA parameter setup:
+Pop <- 20 # population size
+Gen <- 100 # maximum number of generations
+Eli <- 1L # elitism of one individual
+PCx <- 1.0 # crossover probability for a solution
+PMut1 <- 0.01 # single bit mutation probability
+PMut2 <- 0.10 # mutation probability for a solution
+```
+
+```{r}
+# rbga.bin (minimization):
+cat("rbga.bin:\n")
+ga1 <- rbga.bin(
+  size = D, popSize = Pop, iters = Gen,
+  mutationChance = PMut1, zeroToOneRatio = 1,
+  evalFunc = maxsin2, elitism = Eli
+)
+b <- which.min(ga1$evaluations) # best individual
+# show best solution and evaluation value:
+cat("best:", ga1$population[b, ], "f:", -ga1$evaluations[b], "\n")
+```
+
+```{r}
+# ecr (maximization):
+cat("ecr:\n")
+
+ga2 <- ecr(maxsin,
+  minimize = FALSE, n.objectives = 1,
+  n.dim = D, n.bits = D, representation = "binary",
+  mu = Pop, # population size
+  lambda = (Pop - Eli), # new solutions in each generation
+  p.recomb = PCx, p.mut = PMut2,
+  n.elite = Eli,
+  parent.selector = selRoulette, # roulette wheel
+  survival.selector = selRoulette, # roulette wheel
+  recombinator = recCrossover, # one-point crossover
+  terminators = list(stopOnIters(Gen))
+)
+cat("best:", ga2$best.x[[1]], "f:", ga2$best.y, "\n")
+```
+
+```{r}
+# ga (maximization):
+cat("ga:\n")
+ga3 <- ga(
+  type = "binary", maxsin, nBits = D,
+  selection = gabin_nlrSelection, # nonlinear rank
+  crossover = gabin_spCrossover, # one-point crossover
+  popSize = Pop, pcrossover = PCx, pmutation = PMut2,
+  elitism = Eli, maxiter = Gen, monitor = FALSE
+)
+cat("best:", ga3@solution, "f:", ga3@fitnessValue, "\n")
+```
+
+```{r}
+# GAopt (minimization):
+cat("GAopt:\n")
+algo <- list(
+  nB = D, nP = Pop, nG = Gen,
+  crossover = "onePoint", # one-point crossover
+  prob = PMut1, printDetail = FALSE, printBar = FALSE
+)
+ga4 <- GAopt(maxsin2, algo = algo)
+cat("best:", as.numeric(ga4$xbest), "f:", -ga4$OFvalue, "\n")
+```
+
+```{r}
+### rastrigin-ga.R file ###
+
+library(genalg) # load rba.bin
+library(ecr) # load ecr
+library(GA) # load ga
+library(mcga) # load mcga
+
+# real value rastrigin function with a dimension of 30:
+rastrigin <- function(x) 10 * length(x) + sum(x^2 - 10 * cos(2 * pi * x))
+rastrigin2 <- function(x) -rastrigin(x) # maximization goal
+D <- 30
+
+# common setup for the executions:
+lower <- rep(-5.2, D)
+upper <- rep(5.2, D) # lower and upper bounds
+Pop <- 20 # population size
+Gen <- 100 # maximum number of generations
+Eli <- 1 # elitism of one individual
+
+set.seed(12345) # set for replicability
+Dig <- 2 # use 2 digits to show results
+
+# simple function to show best solution and evaluation value:
+showres <- function(s, f, digits = Dig) {
+  cat("best:", round(s, Dig), "f:", round(f, Dig), "\n")
+}
+
+# rbga (minimization):
+cat("rbga:\n")
+ga1 <- rbga(lower, upper,
+  popSize = Pop, iters = Gen,
+  evalFunc = rastrigin, elitism = Eli
+)
+b <- which.min(ga1$evaluations) # best individual
+# show best solution and evaluation value:
+showres(ga1$population[b, ], ga1$evaluations[b])
+
+# ecr (minimization):
+cat("ecr:\n")
+ga2 <- ecr(
+  fitness.fun = rastrigin, minimize = TRUE, n.objectives = 1,
+  n.dim = D,
+  lower = lower, upper = upper, # lower and upper bounds
+  representation = "float", # real values
+  mu = Pop, # population size
+  lambda = round(Pop / 2), # half the population size
+  n.elite = Eli, # elitism
+  # tournament with k=2
+  parent.selector = setup(selTournament, k = 2),
+  survival.selector = setp(selTournament, k = 2),
+  recombinator = recUnifCrossover, # uniform crossover
+  mutator = setup(mutGauss, lower = lower, upper = upper),
+  terminators = list(stopOnIters(Gen))
+)
+showres(ga2$best.x[[1]], ga2$best.y)
+
+# ga (maximization):
+cat("ga:\n")
+ga3 <- ga(
+  type = "real-valued", fitness = rastrigin2,
+  lower = lower, upper = upper, # lower and upper bounds
+  selection = ga_tourSelection, # tournament with k=3
+  crossover = gabin_uCrossover, # uniform crossover
+  mutation = gareal_raMutation, # uniform random mutation
+  popSize = Pop, # population size
+  elitism = Eli, maxiter = Gen, monitor = FALSE
+)
+showres(ga3@solution, -ga3@fitnessValue)
+
+# mcga (minimization):
+cat("mcga:\n") # uniform binary crossover and bit mutation
+ga4 <- mcga(
+  popsize = Pop, chsize = D, elitism = Eli,
+  minval = lower, maxval = upper,
+  maxiter = Gen, evalFunc = rastrigin
+)
+showres(ga4$population[1, ], ga4$costs[1])
+```
+
+## 5.3 Differential Evolution
+
+```{r}
+### sphere-DEoptim.R file ###
+library(DEoptim) # load DEoptim
+
+sphere <- function(x) sum(x^2)
+D <- 2
+maxit <- 100
+set.seed(12345) # set for replicability
+C <- DEoptim.control(
+  strategy = 1,
+  # NP = 5,
+  itermax = maxit, CR = 0.9, F = 0.8,
+  trace = 25, storepopfrom = 1, storepopfreq = 1
+)
+# perform the optimization:
+D <- # suppressWarnings(
+  DEoptim(sphere, rep(-5.2, D), rep(5.2, D), control = C)
+# )
+# show result:
+summary(D)
+```
+
+```{r}
+#| fig-asp: 1.5
+plot(D, plot.type = "storepop")
+```
+
+```{r}
+cat("best:", D$optim$bestmem, "f:", D$optim$bestval, "\n")
+```
+
+```{r}
+### rastrigin-de.R file ###
+
+library(DEoptim) # load DEoptim
+library(DEoptimR) # load JDEoptim
+library(GA) # load GA
+library(NMOF) # load DEopt
+
+# real value rastrigin function with a dimension of 30:
+rastrigin <- function(x) 10 * length(x) + sum(x^2 - 10 * cos(2 * pi * x))
+rastrigin2 <- function(x) -rastrigin(x) # maximization goal
+D <- 30
+
+# common setup for the executions:
+lower <- rep(-5.2, D)
+upper <- rep(5.2, D) # lower and upper bounds
+Pop <- 20 # population size
+Maxit <- 100 # maximum number of iterations
+PCx <- 0.9 # fraction of values that are mutated
+Df <- 0.8 # differential weighting factor
+
+set.seed(12345) # set for replicability
+Dig <- 2 # use 2 digits to show results
+
+# simple function to show best solution and evaluation value:
+showres <- function(s, f, digits = Dig) {
+  cat("best:", round(s, Dig), "f:", round(f, Dig), "\n")
+}
+```
+
+```{r}
+cat("DEoptim:\n") # minimization
+C <- DEoptim.control(NP = Pop, itermax = Maxit * 100, CR = PCx, F = Df, trace = FALSE)
+de1 <- suppressWarnings(DEoptim(rastrigin, lower, upper, control = C))
+showres(de1$optim$bestmem, de1$optim$bestval)
+```
+
+```{r}
+cat("JDEoptim:\n") # minimization
+de2 <- suppressWarnings(JDEoptim(lower, upper,
+  fn = rastrigin,
+  NP = Pop,
+  maxiter = Maxit * 100
+))
+showres(de2$par, de2$value)
+```
+
+```{r}
+cat("de:\n") # maximization
+de2 <- de(rastrigin2, lower, upper,
+  popSize = Pop,
+  maxiter = Maxit, # * 100,
+  pcrossover = PCx, stepsize = Df,
+  monitor = FALSE
+)
+showres(de2@solution, -de2@fitnessValue)
+```
+
+```{r}
+cat("DEopt:\n") # minimization
+algo <- list(
+  nP = Pop,
+  nG = Maxit,
+  CR = PCx, # crossover probability
+  F = Df, # default step size
+  min = lower, max = upper, # lower and upper bounds
+  printDetail = FALSE, printBar = FALSE
+)
+de4 <- DEopt(rastrigin, algo = algo)
+showres(de4$xbest, de4$OFvalue)
+```
+
+## 5.4 Particle Swarm Optimization
+
+```{r}
+### sphere-psoptim.R file ###
+library(pso) # load pso
+
+sphere <- function(x) sum(x^2)
+
+D <- 2
+maxit <- 100
+s <- 5
+set.seed(12345) # set for replicability
+C <- list(trace = 1, maxit = maxit, REPORT = 1, trace.stats = 1, s = s)
+# perform the optimization:
+PSO <- pso::psoptim(rep(NA, D),
+  fn = sphere, lower = rep(-5.2, D),
+  upper = rep(5.2, D), control = C
+)
+```
+
+```{r}
+# result:
+# pdf("psoptim1.pdf", width = 5, height = 5)
+j <- 1 # j-th parameter
+plot(
+  xlim = c(1, maxit), rep(1, s), PSO$stats$x[[1]][j, ], pch = 19,
+  xlab = "iterations", ylab = paste("s_", j, " value", sep = "")
+)
+for (i in 2:maxit) points(rep(i, s), PSO$stats$x[[i]][j, ], pch = 19)
+# dev.off()
+```
+
+```{r}
+# pdf("psoptim2.pdf", width = 5, height = 5)
+plot(PSO$stats$error,
+  type = "l", lwd = 2, xlab = "iterations",
+  ylab = "best fitness"
+)
+# dev.off()
+cat("best:", PSO$par, "f:", PSO$value, "\n")
+```
+
+```{r}
+### rastrigin-pso.R file ###
+
+library(pso) # load pso::psoptim
+library(psoptim) # load psoptim::psoptim
+library(NMOF) # load PSopt
+
+# real value rastrigin function with a dimension of 30:
+rastrigin <- function(x) 10 * length(x) + sum(x^2 - 10 * cos(2 * pi * x))
+rastrigin2 <- function(x) -rastrigin(x)
+D <- 30
+
+# common setup for the executions:
+lower <- rep(-5.2, D)
+upper <- rep(5.2, D) # lower and upper bounds
+Pop <- 20 # swarm size
+Maxit <- 100 # maximum number of iterations
+
+set.seed(12345) # set for replicability
+Dig <- 2 # use 2 digits to show results
+```
+
+```{r}
+# simple function to show best solution and evaluation value:
+showres <- function(s, f, digits = Dig) {
+  cat("best:", round(s, Dig), "f:", round(f, Dig), "\n")
+}
+
+cat("pso::psoptim:\n") # minimization
+C <- list(maxit = Maxit, s = Pop, type = "SPSO2011") # SPSO2011
+pso1 <- pso::psoptim(rep(NA, D),
+  fn = rastrigin,
+  lower = lower, upper = upper,
+  # control = C
+)
+showres(pso1$par, pso1$value)
+```
+
+```{r}
+cat("psoptim::psoptim:\n") # maximization
+pso2 <- psoptim::psoptim(
+  FUN = rastrigin2,
+  n = Pop, # swarm size
+  max.loop = Maxit,
+  xmin = lower, xmax = upper,
+  # velocity constraints in each direction:
+  vmax = rep(4, D), # default 4 value is used
+  anim = FALSE
+)
+```
+
+```{r}
+showres(pso2$sol, -pso2$val)
+```
+
+```{r}
+cat("PSopt:\n") # minimization
+algo <- list(
+  nP = Pop,
+  nG = Maxit,
+  min = lower, max = upper, # lower and upper bounds
+  printDetail = FALSE, printBar = FALSE
+)
+pso3 <- PSopt(rastrigin, algo = algo)
+showres(pso3$xbest, pso3$OFvalue)
+```
+
+## 5.5 Ant Colony Optimization
+
+```{r}
+### sphere-acor.R file ###
+
+library(evoper) # load evoper
+
+# real value sphere function with a dimension of 30:
+sphere <- function(x) sum(x^2)
+sphere2 <- function(...) # called as: sphere2(x1,x2,...,xD)
+{ # ... means a variable sequence of arguments
+  args <- as.list(match.call()) # get the ... arguments
+  # args: sphere2 and the ... arguments
+  # args[[1]]="sphere2", thus use only 2:length(args)
+  x <- vector(length = length(args) - 1)
+  for (i in 2:length(args)) x[i - 1] <- as.numeric(args[[i]])
+  return(sphere(x))
+}
+D <- 30 # dimension
+lower <- -5.2
+upper <- 5.2 # lower and upper bounds
+f <- PlainFunction$new(sphere2)
+# set the 30 parameters with lower and upper bounds:
+for (i in 1:30) {
+  f$Parameter(name = paste("x", i, sep = ""), min = lower, max = upper)
+}
+
+# set acor internal parameters:
+opt <- OptionsACOR$new() # get default acor options
+opt$setValue("iterations", 10)
+opt$setValue("n.ants", 64) # The number of simulated ants
+
+set.seed(12345) # set for replicability
+
+# run the ant colony optimization:
+aco <- abm.acor(f, opt)
+b <- aco$overall.best # best solution
+print(b)
+```
+
+## 5.6 Estimation of Distribution Algorithm
+
+```{r}
+### sphere-EDA.R file ###
+library(copulaedas)
+
+sphere <- function(x) sum(x^2)
+
+D <- 2
+maxit <- 10
+LP <- 5
+set.seed(12345) # set for replicability
+
+# set termination criterion and report method:
+setMethod("edaTerminate", "EDA", edaTerminateMaxGen)
+setMethod("edaReport", "EDA", edaReportSimple)
+
+# set EDA type:
+UMDA <- CEDA(copula = "indep", margin = "norm", popSize = LP, maxGen = maxit)
+UMDA@name <- "UMDA (LP=5)"
+# run the algorithm:
+E <- edaRun(UMDA, sphere, rep(-5.2, D), rep(5.2, D))
+E <- edaRun(UMDA, rastrigin, rep(-5.2, D), rep(5.2, D))
+# show result:
+show(E)
+cat("best:", E@bestSol, "f:", E@bestEval, "\n")
+```
+
+```{r}
+# second EDA execution, using LP=100:
+maxit <- 10
+LP <- 100
+UMDA <- CEDA(copula = "indep", margin = "norm", popSize = LP, maxGen = maxit)
+UMDA@name <- "UMDA (LP=100)"
+setMethod("edaReport", "EDA", edaReportDumpPop) # pop_*.txt files
+E <- edaRun(UMDA, sphere, rep(-5.2, D), rep(5.2, D))
+show(E)
+cat("best:", E@bestSol, "f:", E@bestEval, "\n")
+```
+
+```{r}
+# read dumped files and create a plot:
+# pdf("eda1.pdf",width=7,height=7)
+j <- 1
+# j-th parameter
+i <- 1
+d <- read.table(paste("pop_", i, ".txt", sep = ""))
+plot(
+  xlim = c(1, maxit), rep(1, LP), d[, j], pch = 19,
+  xlab = "iterations", ylab = paste("s_", j, " value", sep = "")
+)
+for (i in 2:maxit)
+{
+  d <- read.table(paste("pop_", i, ".txt", sep = ""))
+  points(rep(i, LP), d[, j], pch = 19)
+}
+# dev.off()
+```
+
+```{r}
+### rastrigin-EDA.R file ###
+D <- 30
+maxit <- 10
+LP <- 5
+set.seed(12345) # set for replicability
+
+# set termination criterion and report method:
+setMethod("edaTerminate", "EDA", edaTerminateMaxGen)
+setMethod("edaReport", "EDA", edaReportSimple)
+
+# set EDA type:
+UMDA <- CEDA(copula = "indep", margin = "norm", popSize = LP, maxGen = maxit)
+UMDA@name <- "UMDA (LP=5)"
+# run the algorithm:
+E <- edaRun(UMDA, rastrigin, rep(-5.2, D), rep(5.2, D))
+# show result:
+show(E)
+cat("best:", E@bestSol, "f:", E@bestEval, "\n")
+```
+
+```{r}
+# second EDA execution, using LP=100:
+maxit <- 10
+LP <- 100
+UMDA <- CEDA(copula = "indep", margin = "norm", popSize = LP, maxGen = maxit)
+UMDA@name <- "UMDA (LP=100)"
+setMethod("edaReport", "EDA", edaReportDumpPop) # pop_*.txt files
+E <- edaRun(UMDA, rastrigin, rep(-5.2, D), rep(5.2, D))
+show(E)
+cat("best:", E@bestSol, "f:", E@bestEval, "\n")
+```
+
+```{r}
+# read dumped files and create a plot:
+# pdf("eda1.pdf",width=7,height=7)
+j <- 1
+# j-th parameter
+i <- 1
+d <- read.table(paste("pop_", i, ".txt", sep = ""))
+plot(
+  xlim = c(1, maxit), rep(1, LP), d[, j], pch = 19,
+  xlab = "iterations", ylab = paste("s_", j, " value", sep = "")
+)
+for (i in 2:maxit)
+{
+  d <- read.table(paste("pop_", i, ".txt", sep = ""))
+  points(rep(i, LP), d[, j], pch = 19)
+}
+# dev.off()
+```
+
+## 5.7 Comparison of Population Based Methods
+
+```{r}
+### compare2.R file ###
+
+# source("functions.R") # bag prices functions
+library(genalg)
+library(DEoptim)
+library(pso)
+library(copulaedas)
+
+# evaluation functions: ------------------------------------
+crastrigin <- function(x) # adapted rastrigin
+{
+  f <- 10 * length(x) + sum(x^2 - 10 * cos(2 * pi * x))
+  # global assignment code: <<-
+  EV <<- EV + 1 # increase evaluations
+  if (f < BEST) BEST <<- f # minimum value
+  if (EV <= MAXFN) F[EV] <<- BEST
+  return(f)
+}
+cprofit <- function(x) # adapted bag prices
+{
+  x <- round(x, digits = 0) # convert x into integer
+  # given that EDA occasionally produces unbounded values:
+  x <- ifelse(x < 1, 1, x) # assure that x is within
+  x <- ifelse(x > 1000, 1000, x) # the [1,1000] bounds
+  s <- sales(x) # get the expected sales
+  c <- cost(s) # get the expected cost
+  profit <- sum(s * x - c) # compute the profit
+  EV <<- EV + 1 # increase evaluations
+  if (profit > BEST) BEST <<- profit # maximum value
+  if (EV <= MAXFN) F[EV] <<- BEST
+  return(-profit) # minimization task!
+}
+# auxiliary functions: ------------------------------------
+crun <- function(method, f, lower, upper, LP, maxit) # run a method
+{
+  if (method == "EA") {
+    rbga(
+      evalFunc = f, stringMin = lower, stringMax = upper, popSize = LP,
+      iters = maxit * 1.5
+    )
+  } else if (method == "DE") {
+    C <- DEoptim.control(itermax = maxit, trace = FALSE, NP = LP)
+    DEoptim(f, lower = lower, upper = upper, control = C)
+  } else if (method == "PSO") {
+    C <- list(maxit = maxit, s = LP)
+    pso::psoptim(rep(NA, length(lower)),
+      fn = f,
+      lower = lower, upper = upper, control = C
+    )
+  } else if (method == "EDA") {
+    setMethod("edaTerminate", "EDA", edaTerminateMaxGen)
+    GCEDA <- CEDA(
+      copula = "normal", margin = "norm", popSize = LP,
+      maxGen = maxit
+    )
+    GCEDA@name <- "GCEDA"
+    edaRun(GCEDA, f, lower, upper)
+  }
+}
+
+successes <- function(x, LIM, type = "min") # number of successes
+{
+  if (type == "min") {
+    return(sum(x < LIM))
+  } else {
+    return(sum(x > LIM))
+  }
+}
+
+ctest <- function(Methods, f, lower, upper, type = "min", Runs, # test
+                  D, MAXFN, maxit, LP, pdf, main, LIM) # all methods:
+{
+  RES <- vector("list", length(Methods)) # all results
+  VAL <- matrix(nrow = Runs, ncol = length(Methods)) # best values
+  for (m in 1:length(Methods)) { # initialize RES object
+    RES[[m]] <- matrix(nrow = MAXFN, ncol = Runs)
+  }
+
+  for (R in 1:Runs) { # cycle all runs
+    for (m in 1:length(Methods))
+    {
+      EV <<- 0
+      F <<- rep(NA, MAXFN) # reset EV and F
+      if (type == "min") BEST <<- Inf else BEST <<- -Inf # reset BEST
+      suppressWarnings(crun(Methods[m], f, lower, upper, LP, maxit))
+      RES[[m]][, R] <- F # store all best values
+      VAL[R, m] <- F[MAXFN] # store best value at MAXFN
+    }
+  }
+  # compute average F result per method:
+  AV <- matrix(nrow = MAXFN, ncol = length(Methods))
+  for (m in 1:length(Methods)) {
+    for (i in 1:MAXFN) {
+      AV[i, m] <- mean(RES[[m]][i, ])
+    }
+  }
+  # show results:
+  cat(main, "\n", Methods, "\n")
+  cat(round(apply(VAL, 2, mean), digits = 0), " (average best)\n")
+  cat(round(100 * apply(VAL, 2, successes, LIM, type) / Runs,
+    digits = 0
+  ), " (%successes)\n")
+
+  # create pdf file:
+  pdf(paste(pdf, ".pdf", sep = ""), width = 5, height = 5, paper = "special")
+  par(mar = c(4.0, 4.0, 1.8, 0.6)) # reduce default plot margin
+  MIN <- min(AV)
+  MAX <- max(AV)
+  # use a grid to improve clarity:
+  g1 <- seq(1, MAXFN, length.out = 500) # grid for lines
+  plot(g1, AV[g1, 1],
+    ylim = c(MIN, MAX), type = "l", lwd = 2, main = main,
+    ylab = "average best", xlab = "number of evaluations"
+  )
+  for (i in 2:length(Methods)) lines(g1, AV[g1, i], lwd = 2, lty = i)
+  if (type == "min") position <- "topright" else position <- "bottomright"
+  legend(position, legend = Methods, lwd = 2, lty = 1:length(Methods))
+  dev.off() # close the PDF device
+}
+```
+
+```{r}
+# define EV, BEST and F:
+MAXFN <- 10000
+EV <- 0
+BEST <- Inf
+F <- rep(NA, MAXFN)
+# define method labels:
+Methods <- c("EA", "DE", "PSO", "EDA")
+# rastrigin comparison: -----------------------------------
+Runs <- 50
+D <- 20
+LP <- 100
+maxit <- 100
+lower <- rep(-5.2, D)
+upper <- rep(5.2, D)
+ctest(
+  Methods, crastrigin, lower, upper, "min", Runs, D, MAXFN, maxit, LP,
+  "comp-rastrigin2", "rastrigin (D=20)", 75
+)
+```
+
+```{r}
+# bag prices comparison: ----------------------------------
+MAXFN <- 5000
+F <- rep(NA, MAXFN)
+Runs <- 50
+D <- 5
+LP <- 50
+maxit <- 100
+lower <- rep(1, D)
+upper <- rep(1000, D)
+ctest(
+  Methods, cprofit, lower, upper, "max", Runs, D, MAXFN, maxit, LP,
+  "comp-bagprices", "bag prices (D=5)", 43500
+)
+```
+
+## 5.8 Bag Prices with Constraint
+
+```{r}
+# setwd("Rcode")
+### bag-prices-constr.R file ###
+
+# source("functions.R") # bag prices functions
+library(copulaedas) # EDA
+
+# evaluation function:  ------------------------------------
+cprofit2 <- function(x) # bag prices with death-penalty
+{
+  x <- round(x, digits = 0) # convert x into integer
+  x <- ifelse(x < 1, 1, x) # assure that x is within
+  x <- ifelse(x > 1000, 1000, x) # the [1,1000] bounds
+  s <- sales(x)
+  if (sum(s) > 50) {
+    res <- Inf
+  } # if needed, death-penalty!!!
+  else {
+    c <- cost(s)
+    profit <- sum(s * x - c)
+    # if needed, store best value
+    if (profit > BEST) {
+      BEST <<- profit
+      B <<- x
+    }
+    res <- -profit # minimization task!
+  }
+  EV <<- EV + 1 # increase evaluations
+  if (EV <= MAXFN) F[EV] <<- BEST
+  return(res)
+}
+# example of a local search method that repairs a solution:
+localRepair <- function(eda, gen, pop, popEval, f, lower, upper) {
+  for (i in 1:nrow(pop))
+  {
+    x <- pop[i, ]
+    x <- round(x, digits = 0) # convert x into integer
+    x <- ifelse(x < lower[1], lower[1], x) # assure x within
+    x <- ifelse(x > upper[1], upper[1], x) # bounds
+    s <- sales(x)
+    if (sum(s) > 50) {
+      x1 <- x
+      while (sum(s) > 50) # new constraint: repair
+      { # increase price to reduce sales:
+        x1 <- x1 + abs(round(rnorm(D, mean = 0, sd = 5)))
+        x1 <- ifelse(x1 > upper[1], upper[1], x1) # bound if needed
+        s <- sales(x1)
+      }
+      x <- x1 # update the new x
+    }
+    pop[i, ] <- x
+    popEval[i] <- f(x)
+  }
+  return(list(pop = pop, popEval = popEval))
+}
+
+# experiment: ----------------------------------------------
+MAXFN <- 5000
+Runs <- 50
+D <- 5
+LP <- 50
+maxit <- 100
+lower <- rep(1, D)
+upper <- rep(1000, D)
+Methods <- c("Death", "Repair")
+setMethod("edaTerminate", "EDA", edaTerminateMaxGen)
+GCEDA <- CEDA(
+  copula = "normal", margin = "norm", popSize = LP,
+  maxGen = maxit, fEvalStdDev = 10
+)
+GCEDA@name <- "GCEDA"
+
+RES <- vector("list", length(Methods)) # all results
+VAL <- matrix(nrow = Runs, ncol = length(Methods)) # best values
+for (m in 1:length(Methods)) { # initialize RES object
+  RES[[m]] <- matrix(nrow = MAXFN, ncol = Runs)
+}
+for (R in 1:Runs) # cycle all runs
+{
+  B <- NA
+  EV <- 0
+  F <- rep(NA, MAXFN)
+  BEST <- -Inf # reset vars.
+  setMethod("edaOptimize", "EDA", edaOptimizeDisabled)
+  setMethod("edaTerminate", "EDA", edaTerminateMaxGen)
+  suppressWarnings(edaRun(GCEDA, cprofit2, lower, upper))
+  RES[[1]][, R] <- F # store all best values
+  VAL[R, 1] <- F[MAXFN] # store best value at MAXFN
+
+  B <- NA
+  EV <- 0
+  F <- rep(NA, MAXFN)
+  BEST <- -Inf # reset vars.
+  # set local repair search method:
+  setMethod("edaOptimize", "EDA", localRepair)
+  # set additional termination criterion:
+  setMethod(
+    "edaTerminate", "EDA",
+    edaTerminateCombined(edaTerminateMaxGen, edaTerminateEvalStdDev)
+  )
+  # this edaRun might produces warnings or errors:
+  suppressWarnings(try(edaRun(GCEDA, cprofit2, lower, upper), silent = TRUE))
+  if (EV < MAXFN) { # if stopped due to EvalStdDev
+    F[(EV + 1):MAXFN] <- rep(F[EV], MAXFN - EV)
+  } # replace NAs
+  RES[[2]][, R] <- F # store all best values
+  VAL[R, 2] <- F[MAXFN] # store best value at MAXFN
+}
+
+# compute average F result per method:
+AV <- matrix(nrow = MAXFN, ncol = length(Methods))
+for (m in 1:length(Methods)) {
+  for (i in 1:MAXFN) {
+    AV[i, m] <- mean(RES[[m]][i, ])
+  }
+}
+# show results:
+cat(Methods, "\n")
+cat(round(apply(VAL, 2, mean), digits = 0), " (average best)\n")
+# Mann-Whitney non-parametric test:
+p <- wilcox.test(VAL[, 1], VAL[, 2], paired = TRUE)$p.value
+cat("p-value:", round(p, digits = 2), "(<0.05)\n")
+```
+
+```{r}
+# create pdf file:
+# pdf("comp-bagprices-constr.pdf", width = 5, height = 5, paper = "special")
+par(mar = c(4.0, 4.0, 1.8, 0.6)) # reduce default plot margin
+# use a grid to improve clarity:
+g1 <- seq(1, MAXFN, length.out = 500) # grid for lines
+plot(g1, AV[g1, 2],
+  type = "l", lwd = 2,
+  main = "bag prices with constraint",
+  ylab = "average best", xlab = "number of evaluations"
+)
+lines(g1, AV[g1, 1], lwd = 2, lty = 2)
+legend("bottomright", legend = rev(Methods), lwd = 2, lty = 1:4)
+# dev.off() # close the PDF device
+```
+
+## 5.9 Parallel Execution of Population Based Methods
+
+```{r}
+### rastrigin-p1.R file ###
+
+# packages with parallel execution:
+library(GA) # load ga
+library(DEoptim) # load DEoptim
+
+# package to measure time elapsed:
+library(tictoc) # load tic and toc
+
+# computationally slow rastrigin function:
+srastrigin <- function(x) {
+  res <- 10 * length(x) + sum(x^2 - 10 * cos(2 * pi * x))
+  Sys.sleep(0.01) # sleep ms
+  return(res)
+}
+srastrigin2 <- function(x) -srastrigin(x) # maximization goal
+D <- 30 # dimension
+
+# common setup for the executions:
+lower <- rep(-5.2, D)
+upper <- rep(5.2, D) # lower and upper bounds
+Pop <- 100 # population size
+Maxit <- 20 # maximum number of iterations
+Eli <- 1 # elitism of one individual
+Dig <- 2 # use 2 digits to show results
+
+# show best solution, evaluation value and time elapsed:
+showres2 <- function(f, tm, digits = Dig) {
+  cat("f:", round(f, Dig), "time:", round(tm, Dig), "\n")
+}
+
+# Number of processing Cores (change if needed):
+NC <- 4 # NC=detectCores() is another option
+cat(">> Experiments with:", NC, "cores\n")
+```
+
+```{r}
+cat("sequential ga:\n")
+set.seed(123) # set for replicability
+tic()
+ga1 <- ga(
+  type = "real-valued", fitness = srastrigin2,
+  lower = lower, upper = upper, # lower and upper bounds
+  popSize = Pop, # population size
+  elitism = Eli, maxiter = Maxit, monitor = FALSE
+)
+te <- toc(quiet = TRUE) # time elapsed
+showres2(-ga1@fitnessValue, te$toc - te$tic)
+```
+
+```{r}
+cat("parallel ga:\n")
+set.seed(123) # set for replicability
+tic()
+ga2 <- ga(
+  type = "real-valued", fitness = srastrigin2,
+  lower = lower, upper = upper, # lower and upper bounds
+  popSize = Pop, elitism = Eli, maxiter = Maxit,
+  parallel = NC, # NC cores for parallel evaluation
+  monitor = FALSE
+)
+te <- toc(quiet = TRUE) # time elapsed
+showres2(-ga2@fitnessValue, te$toc - te$tic)
+```
+
+```{r}
+cat("sequential DEoptim:\n") # minimization
+set.seed(123) # set for replicability
+tic()
+C <- DEoptim.control(NP = Pop, itermax = Maxit, trace = FALSE)
+de1 <- suppressWarnings(DEoptim(srastrigin, lower, upper, control = C))
+te <- toc(quiet = TRUE) # time elapsed
+showres2(de1$optim$bestval, te$toc - te$tic)
+```
+
+```{r}
+library(parallel)
+cat("parallel DEoptim:\n") # minimization
+set.seed(123) # set for replicability
+cl <- makeCluster(NC) # set NC cores
+tic()
+# C <- DEoptim.control(NP = Pop, itermax = Maxit, trace = FALSE, parallelType = 1, cluster = cl)
+C <- DEoptim.control(NP = Pop, itermax = Maxit, trace = FALSE, parallelType = 1)
+de2 <- suppressWarnings(DEoptim(srastrigin, lower, upper, control = C))
+te <- toc(quiet = TRUE) # time elapsed
+# parallel::stopCluster(cl) # stop the cluster
+showres2(de2$optim$bestval, te$toc - te$tic)
+```
+
+```{r}
+### rastrigin-p2.R file ###
+
+library(GA) # load ga and gaisl
+library(tictoc) # load tic and toc
+
+# real value rastrigin function with a dimension of 30:
+rastrigin <- function(x) 10 * length(x) + sum(x^2 - 10 * cos(2 * pi * x))
+rastrigin2 <- function(x) -rastrigin(x) # maximization goal
+D <- 30
+
+# common setup for the executions:
+lower <- rep(-5.2, D)
+upper <- rep(5.2, D) # lower and upper bounds
+Pop <- 1000 # population size
+Maxit <- 20 # maximum number of iterations
+Dig <- 2 # use 2 digits to show results
+Migrate <- 5 # migrate solutions every 5 iterations
+
+# show best solution, evaluation value and time elapsed:
+showres2 <- function(f, tm, digits = Dig) {
+  cat("f:", round(f, Dig), "time:", round(tm, Dig), "\n")
+}
+
+# Number of processing Cores (change if needed):
+NC <- detectCores()
+cat(">> Experiments with:", NC, "cores\n")
+
+cat("sequential ga:\n")
+set.seed(123) # set for replicability
+tic()
+ga1 <- ga(
+  type = "real-valued", fitness = rastrigin2,
+  lower = lower, upper = upper, # lower and upper bounds
+  popSize = Pop, # population size
+  maxiter = Maxit, monitor = FALSE
+)
+te <- toc(quiet = TRUE) # time elapsed
+showres2(-ga1@fitnessValue, te$toc - te$tic)
+
+cat("sequential island:\n")
+set.seed(123) # set for replicability
+tic()
+ga2 <- gaisl(
+  type = "real-valued", fitness = rastrigin2,
+  lower = lower, upper = upper, # lower and upper bounds
+  popSize = Pop,
+  numIslands = NC, # number of Islands
+  migrationInterval = Migrate,
+  parallel = FALSE, # do not use
+  monitor = FALSE
+)
+te <- toc(quiet = TRUE) # time elapsed
+showres2(-ga2@fitnessValue, te$toc - te$tic)
+
+cat("islands ga (GA package):\n")
+set.seed(123) # set for replicability
+tic()
+ga3 <- gaisl(
+  type = "real-valued", fitness = rastrigin2,
+  lower = lower, upper = upper, # lower and upper bounds
+  popSize = Pop,
+  numIslands = NC, # number of Islands
+  migrationInterval = Migrate,
+  parallel = TRUE, # use the cores
+  monitor = FALSE
+)
+te <- toc(quiet = TRUE) # time elapsed
+showres2(-ga3@fitnessValue, te$toc - te$tic)
+```
+
+## 5.10 Genetic Programming
+
+```{r}
+# 설치 불가
+# library(devtools)
+# install.packages("emoa") # install emoa rgp dependency
+# install_version("rgp",version="0.4-1") # install archived rgp
+```
+
+## 5.11 Grammatical Evolution
+
+```{r}
+# 설치 불가
+# install.packages("gramEvol")
+```
+
+```{r}
+### rastrigin-ge.R ###
+
+library(gramEvol) # load gramEvol
+
+# auxiliary functions:
+rastrigin <- function(x) 10 * length(x) + sum(x^2 - 10 * cos(2 * pi * x))
+mse <- function(y1, y2) mean((y1 - y2)^2) # mean squared error
+
+# set the grammar rules:
+#   the first production rule is:
+#   <expr> ::= <expr><op><expr2> | <expr2>
+ruleDef <- list(
+  expr = gsrule("<expr><op><expr2>", "<expr2>"),
+  op = gsrule("+", "-", "*"),
+  expr2 = gsrule("x[1]", "x[2]", "<value>"),
+  value = gsrule("<digits>.<digits>"),
+  digits = gsrule("<digits><digit>", "<digit>"),
+  digit = grule(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+)
+# create the BNF grammar object:
+gDef <- CreateGrammar(ruleDef)
+
+# two expansion examples:
+expr <- GrammarMap(c(2, 1, 0, 0, 4), gDef, verbose = TRUE)
+print(expr) # show expression: x[1] + x[2]
+expr2 <- GrammarMap(c(3, 2, 1, 1, 5, 0, 1, 3, 2), gDef, verbose = TRUE)
+print(expr2) # show expression: 5.32
+
+# grammatical evolution setup:
+Pop <- 100 # population size
+Gen <- 100 # number of generations
+Eli <- 1 # elitism
+# simple monitoring function:
+monitor <- function(results) { # print(str(results)) shows all results components
+  iter <- results$population$currentIteration # current iteration
+  f <- results$best$cost # best fitness value
+  if (iter == 1 || iter %% 10 == 0) { # show 1st and every 10 iter
+    cat("iter:", iter, "f:", f, "\n")
+  }
+}
+
+# set the input samples (grid^2 data points):
+grid <- 10 # size of the grid used
+domain <- matrix(ncol = 2, nrow = grid^2) # 2D domain grid
+domain[, 1] <- rep(seq(-5.2, 5.2, length.out = grid), each = grid)
+domain[, 2] <- rep(seq(-5.2, 5.2, length.out = grid), times = grid)
+
+y <- apply(domain, 1, rastrigin) # compute target output
+
+eval1 <- function(x, expr) # x is an input vector with D=2
+{ # expr can include x[1] or x[2] symbols
+  eval(expr)
+}
+
+msevalue2 <- function(expr) # evaluation function
+{
+  y_expr <- apply(domain, 1, eval1, expr) # expr outputs for domain
+  return(mse(y, y_expr))
+}
+
+set.seed(12345) # set for replicability
+# run the grammar evolution:
+ge <- GrammaticalEvolution(gDef, msevalue2,
+  optimizer = "ga",
+  popSize = Pop, elitism = Eli,
+  iterations = Gen, monitorFunc = monitor
+)
+b <- ge$best # best solution
+cat("evolved phenotype:")
+print(b$expression)
+cat("f:", b$cost, "\n")
+```
+
+```{r}
+# create approximation plot:
+y2 <- apply(domain, 1, eval1, b$expression)
+MIN <- min(y, y2)
+MAX <- max(y, y2)
+# pdf("ge-function.pdf",width=7,height=7,paper="special")
+plot(y,
+  ylim = c(MIN, MAX), type = "l", lwd = 2, lty = 1,
+  xlab = "points", ylab = "function values"
+)
+lines(y2, type = "l", lwd = 2, lty = 2)
+legend("bottomright",
+  leg = c("rastrigin", "GE function"), lwd = 2,
+  lty = 1:2
+)
+# dev.off()
+```
