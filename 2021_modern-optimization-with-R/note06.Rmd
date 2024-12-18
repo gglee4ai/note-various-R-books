@@ -48,6 +48,8 @@ fes1 <- function(x) {
 }
 ```
 
+## 6.3 Weighted-Formula Approach
+
 ```{r}
 ### wf-test.R file ###
 
@@ -107,9 +109,9 @@ for (i in 1:step)
   cat(" f=(", profit(b), ",", produced(b), ")", "\n", sep = "")
   res[i, ] <- c(profit(b), produced(b))
 }
-# write.table(res, "wf-bag.csv",
-#   row.names = FALSE, col.names = FALSE, sep = " "
-# )
+write.table(res, "wf-bag.csv",
+  row.names = FALSE, col.names = FALSE, sep = " "
+)
 res
 ```
 
@@ -134,10 +136,746 @@ for (i in 1:step)
   cat(" f=(", round(fes1(b)[1], 2), ",", round(fes1(b)[2], 2), ")", "\n", sep = "")
   res[i, ] <- fes1(b)
 }
-# write.table(res, "wf-fes1.csv",
-#   row.names = FALSE, col.names = FALSE, sep = " "
-# )
+write.table(res, "wf-fes1.csv",
+  row.names = FALSE, col.names = FALSE, sep = " "
+)
 res
 ```
 
 ## 6.4 Lexicographic Approach
+
+```{r}
+### lg-ga.R file ###
+
+# lexicographic comparison of several solutions:
+#    x - is a matrix with several objectives at each column
+#        and each row is related with a solution
+lexibest <- function(x) # assumes LEXI is defined (global variable)
+{
+  size <- nrow(x)
+  m <- ncol(x)
+  candidates <- 1:size
+  stop <- FALSE
+  i <- 1
+  while (!stop) {
+    F <- x[candidates, i] # i-th goal
+    minFID <- which.min(F) # minimization goal is assumed
+    minF <- F[minFID]
+    # compute tolerance value
+    if (minF > -1 && minF < 1) {
+      tolerance <- LEXI[i]
+    } else {
+      tolerance <- abs(LEXI[i] * minF)
+    }
+    I <- which((F - minF) <= tolerance)
+    if (length(I) > 0) { # at least one candidate
+      candidates <- candidates[I]
+    } # update candidates
+    else {
+      stop <- TRUE
+    }
+    if (!stop && i == m) {
+      stop <- TRUE
+    } else {
+      i <- i + 1
+    }
+  }
+  if (length(candidates) > 1) { # return highest priority goal if no clear winner:
+    stop <- FALSE
+    i <- 1
+    while (!stop) {
+      minF <- min(x[candidates, i])
+      I <- which(x[candidates, i] == minF)
+      candidates <- candidates[I]
+      if (length(candidates) == 1 || i == m) {
+        stop <- TRUE
+      } else {
+        i <- i + 1
+      }
+    }
+    # remove (any) extra duplicate individuals:
+    candidates <- candidates[1]
+  }
+  # return lexibest:
+  return(candidates)
+}
+
+# compare k randomly selected solutions from Population:
+#    returns n best indexes of Population (decreasing order)
+#    m is the number of objectives
+tournament <- function(Population, evalFunc, k, n, m = 2) {
+  popSize <- nrow(Population)
+  PID <- sample(1:popSize, k) # select k random tournament solutions
+  E <- matrix(nrow = k, ncol = m) # evaluations of tournament solutions
+  for (i in 1:k) { # evaluate tournament
+    E[i, ] <- evalFunc(Population[PID[i], ])
+  }
+
+  # return best n individuals:
+  B <- lexibest(E)
+  i <- 1
+  res <- PID[B] # best individual
+  while (i < n) # other best individuals
+  {
+    E <- E[-B, ]
+    PID <- PID[-B] # all except B
+    if (is.matrix(E)) {
+      B <- lexibest(E)
+    } else {
+      B <- 1
+    } # only 1 row
+    res <- c(res, PID[B])
+    i <- i + 1
+  }
+  return(res)
+}
+
+# lexicographic adapted version of rbga.bin:
+#   this function is almost identical to rbga.bin except that
+#   the code was simplified and a lexicographic tournament is
+#   used instead of roulette wheel selection
+lrbga.bin <- function(size = 10, suggestions = NULL, popSize = 200,
+                      iters = 100, mutationChance = NA, elitism = NA,
+                      zeroToOneRatio = 10, evalFunc = NULL) {
+  vars <- size
+  if (is.na(mutationChance)) {
+    mutationChance <- 1 / (vars + 1)
+  }
+  if (is.na(elitism)) {
+    elitism <- floor(popSize / 5)
+  }
+  if (!is.null(suggestions)) {
+    population <- matrix(nrow = popSize, ncol = vars)
+    suggestionCount <- dim(suggestions)[1]
+    for (i in 1:suggestionCount) {
+      population[i, ] <- suggestions[i, ]
+    }
+    for (child in (suggestionCount + 1):popSize)
+    {
+      population[child, ] <- sample(c(rep(0, zeroToOneRatio), 1), vars, rep = TRUE)
+      while (sum(population[child, ]) == 0) {
+        population[child, ] <- sample(c(rep(0, zeroToOneRatio), 1), vars, rep = TRUE)
+      }
+    }
+  } else {
+    population <- matrix(nrow = popSize, ncol = vars)
+    for (child in 1:popSize)
+    {
+      population[child, ] <- sample(c(rep(0, zeroToOneRatio), 1), vars, rep = TRUE)
+      while (sum(population[child, ]) == 0) {
+        population[child, ] <- sample(c(rep(0, zeroToOneRatio), 1), vars, rep = TRUE)
+      }
+    }
+  }
+  # main GA cycle:
+  for (iter in 1:iters)
+  {
+    newPopulation <- matrix(nrow = popSize, ncol = vars)
+    if (elitism > 0) # applying elitism:
+      {
+        elitismID <- tournament(population, evalFunc, k = popSize, n = elitism)
+        newPopulation[1:elitism, ] <- population[elitismID, ]
+      }
+    #  applying crossover:
+    for (child in (elitism + 1):popSize)
+    {
+      ### very new code inserted here : ###
+      pID1 <- tournament(population, evalFunc = evalFunc, k = 2, n = 1)
+      pID2 <- tournament(population, evalFunc = evalFunc, k = 2, n = 1)
+      parents <- population[c(pID1, pID2), ]
+      ### end of very new code          ###
+      crossOverPoint <- sample(0:vars, 1)
+      if (crossOverPoint == 0) {
+        newPopulation[child, ] <- parents[2, ]
+      } else if (crossOverPoint == vars) {
+        newPopulation[child, ] <- parents[1, ]
+      } else {
+        newPopulation[child, ] <- c(parents[1, ][1:crossOverPoint], parents[2, ][(crossOverPoint + 1):vars])
+        while (sum(newPopulation[child, ]) == 0) {
+          newPopulation[child, ] <- sample(c(rep(0, zeroToOneRatio), 1), vars, rep = TRUE)
+        }
+      }
+    }
+    population <- newPopulation # store new population
+    if (mutationChance > 0) # applying mutations:
+      {
+        mutationCount <- 0
+        for (object in (elitism + 1):popSize)
+        {
+          for (var in 1:vars)
+          {
+            if (runif(1) < mutationChance) {
+              population[object, var] <- sample(c(rep(0, zeroToOneRatio), 1), 1)
+              mutationCount <- mutationCount + 1
+            }
+          }
+        }
+      }
+  } # end of GA main cycle
+  result <- list(
+    type = "binary chromosome", size = size, popSize = popSize,
+    iters = iters, suggestions = suggestions,
+    population = population, elitism = elitism,
+    mutationChance = mutationChance
+  )
+  return(result)
+}
+```
+
+```{r}
+### lg-test.R file ###
+
+# source("mo-tasks.R") # load multi-optimization tasks
+# source("lg-ga.R") # load lrgba.bin
+set.seed(12345) # set for replicability
+
+LEXI <- c(0.2, 0.2) # tolerance 20% for each goal
+cat("tolerance thresholds:", LEXI, "\n")
+
+# --- binary task:
+D <- 8 # 8 bits
+# mineval: transform binary objectives into minimization goal
+#       returns a vector with 2 values, one per objective:
+mineval <- function(x) {
+  return(c(-sumbin(x), -maxsin(x)))
+}
+popSize <- 12
+G <- lrbga.bin(
+  size = D, popSize = popSize, iters = 100, zeroToOneRatio = 1,
+  evalFunc = mineval, elitism = 1
+)
+print("Ranking of last population:")
+B <- tournament(G$population, mineval, k = popSize, n = popSize, m = 2)
+for (i in 1:popSize)
+{
+  x <- G$population[B[i], ]
+  cat(x, " f=(", sumbin(x), ",", round(maxsin(x), 2), ")", "\n", sep = "")
+}
+```
+
+## 6.5 Pareto Approach
+
+```{r}
+### nsga2-test.R file ###
+
+# source("mo-tasks.R") # load multi-optimization tasks
+library(mco) # load mco package
+
+set.seed(12345) # set for replicability
+m <- 2 # two objectives
+
+# --- binary task:
+D <- 8 # 8 bits
+# eval: transform binary objectives into minimization goal
+#       round(x) is used to convert real number to 0 or 1 values
+beval <- function(x) c(-sumbin(round(x)), -maxsin(round(x)))
+
+cat("binary task:\n")
+G <- nsga2(
+  fn = beval, idim = D, odim = m,
+  lower.bounds = rep(0, D), upper.bounds = rep(1, D),
+  popsize = 12, generations = 100
+)
+# show last Pareto front
+I <- which(G$pareto.optimal)
+for (i in I)
+{
+  x <- round(G$par[i, ])
+  cat(x, " f=(", sumbin(x), ",", round(maxsin(x), 2), ")", "\n", sep = "")
+}
+```
+
+```{r}
+# --- integer task:
+D <- 5 # 5 bag prices
+# ieval: integer evaluation (minimization goal):
+ieval <- function(x) c(-profit(x), produced(x))
+# function that sorts matrix m according to 1st column
+o1 <- function(m) { # m is a matrix
+  return(m[order(m[, 1]), ])
+}
+
+cat("integer task:\n")
+G <- nsga2(
+  fn = ieval, idim = 5, odim = m,
+  lower.bounds = rep(1, D), upper.bounds = rep(1000, D),
+  popsize = 20, generations = 1:100
+)
+# show best individuals:
+I <- which(G[[100]]$pareto.optimal)
+for (i in I)
+{
+  x <- round(G[[100]]$par[i, ])
+  cat(x, " f=(", profit(x), ",", produced(x), ")", "\n", sep = " ")
+}
+```
+
+```{r}
+# create PDF with Pareto front evolution:
+# pdf(file = "nsga-bag.pdf", paper = "special", height = 5, width = 5)
+par(mar = c(4.0, 4.0, 0.1, 0.1))
+I <- 1:100
+for (i in I)
+{
+  P <- G[[i]]$value # objectives f1 and f2
+  P[, 1] <- -1 * P[, 1] # show positive f1 values
+  # color from light gray (75) to dark (1):
+  COL <- paste("gray", round(76 - i * 0.75), sep = "")
+  if (i == 1) {
+    plot(P,
+      xlim = c(-500, 44000), ylim = c(0, 140),
+      xlab = "f1", ylab = "f2", cex = 0.5, col = COL
+    )
+  }
+  Pareto <- P[G[[i]]$pareto.optimal, ]
+  # sort Pareto according to x axis:
+  Pareto <- o1(Pareto)
+  points(P, type = "p", pch = 1, cex = 0.5, col = COL)
+  lines(Pareto, type = "l", cex = 0.5, col = COL)
+}
+# dev.off()
+```
+
+```{r}
+# create PDF comparing NSGA-II with WF:
+# pdf(file = "nsga-bag2.pdf", paper = "special", height = 5, width = 5)
+par(mar = c(4.0, 4.0, 0.1, 0.1))
+# NSGA-II best results:
+P <- G[[100]]$value # objectives f1 and f2
+P[, 1] <- -1 * P[, 1] # show positive f1 values
+Pareto <- P[G[[100]]$pareto.optimal, ]
+# sort Pareto according to x axis:
+Pareto <- o1(Pareto)
+plot(Pareto,
+  xlim = c(-500, 44000), ylim = c(0, 140),
+  xlab = "f1", ylab = "f2", type = "b", lwd = 2, lty = 1, pch = 1
+)
+# weight-formula (wf) best results:
+wf <- read.table("wf-bag.csv", sep = " ") # data.frame
+# paretoFilter only works with minimization goals:
+wf <- as.matrix(cbind(-wf[, 1], wf[, 2])) # matrix with -f1,f2
+pwf <- paretoFilter(wf) # get the Pareto front points of wf
+wf[, 1] <- -wf[, 1] # set to the f1,f2 domain
+pwf[, 1] <- -pwf[, 1] # set to the f1,f2 domain
+points(wf, pch = 3, lwd = 2) # plot all wf points
+lines(pwf, type = "l", lty = 2, lwd = 2)
+legend("topleft", c("NSGA-II", "weighted-formula"),
+  lwd = 2, lty = 1:2, pch = c(1, 3)
+)
+# dev.off()
+```
+
+```{r}
+# --- real value task:
+D <- 8 # dimension
+cat("real value task:\n")
+G <- nsga2(
+  fn = fes1, idim = D, odim = m,
+  lower.bounds = rep(0, D), upper.bounds = rep(1, D),
+  popsize = 20, generations = 1:100
+)
+# show best individuals:
+I <- which(G[[100]]$pareto.optimal)
+for (i in I)
+{
+  x <- round(G[[100]]$par[i, ], digits = 2)
+  cat(x)
+  cat(" f=(", round(fes1(x)[1], 2), ",", round(fes1(x)[2], 2), ")", "\n", sep = "")
+}
+# create PDF with Pareto front evolution:
+# pdf(file = "nsga-fes1.pdf", paper = "special", height = 5, width = 5)
+par(mar = c(4.0, 4.0, 0.1, 0.1))
+I <- 1:100
+for (i in I)
+{
+  P <- G[[i]]$value # objectives f1 and f2
+  # color from light gray (75) to dark (1):
+  COL <- paste("gray", round(76 - i * 0.75), sep = "")
+  if (i == 1) {
+    plot(P,
+      xlim = c(0.5, 5.0), ylim = c(0, 2.0),
+      xlab = "f1", ylab = "f2", cex = 0.5, col = COL
+    )
+  }
+  Pareto <- P[G[[i]]$pareto.optimal, ]
+  # sort Pareto according to x axis:
+  Pareto <- o1(Pareto)
+  points(Pareto, type = "p", pch = 1, cex = 0.5, col = COL)
+  lines(Pareto, type = "l", cex = 0.5, col = COL)
+}
+# dev.off()
+
+# create PDF comparing NSGA-II with WF:
+# pdf(file = "nsga-fes1-2.pdf", paper = "special", height = 5, width = 5)
+par(mar = c(4.0, 4.0, 0.1, 0.1))
+# NSGA-II best results:
+P <- G[[100]]$value # objectives f1 and f2
+Pareto <- P[G[[100]]$pareto.optimal, ]
+# sort Pareto according to x axis:
+Pareto <- o1(Pareto)
+plot(Pareto,
+  xlim = c(0.5, 5.0), ylim = c(0, 2.0),
+  xlab = "f1", ylab = "f2", type = "b", lwd = 2, pch = 1
+)
+# weight-formula best results:
+wf <- read.table("wf-fes1.csv", sep = " ") # data.frame
+wf <- as.matrix(wf) # convert to matrix
+pwf <- paretoFilter(wf) # get the Pareto front points of wf
+points(wf, pch = 3, lwd = 2) # plot all wf points
+lines(pwf, type = "l", lty = 2, lwd = 2)
+legend("top", c("NSGA-II", "weighted-formula"),
+  lwd = 2, lty = 1:2, pch = c(1, 3)
+)
+# dev.off()
+```
+
+```{r}
+### bagprices-pareto.R file ###
+
+# source("mo-tasks.R") # load multi-optimization tasks
+
+library(mco) # load mco::nsga2
+library(ecr) # load ecr::nsga2, smsemoa, asemoa
+
+# --- integer bag prices task (common setup):
+m <- 2 # two objectives
+D <- 5 # 5 bag prices
+Pop <- 20 # population size
+Gen <- 100 # maximum number of generations (stop criterion)
+lower <- rep(1, D)
+upper <- rep(1000, D)
+Seed <- 12345
+ref <- c(0, 140) # reference point: used by the hypervolume
+
+# auxiliary functions --------------------------------
+# ieval: integer evaluation (minimization goal):
+ieval <- function(x) c(-profit(x), produced(x)) # -f1,f2
+# function that converts -f1 to f1:
+f1 <- function(m) # m is a matrix
+{
+  m[, 1] <- -1 * m[, 1]
+  return(m)
+} # f1 = -1 * -f1
+
+# function that sorts m according to 1st column
+o1 <- function(m) { # m is a matrix
+  return(m[order(m[, 1]), ])
+}
+# function that shows the hypervolume
+showhv <- function(p) # p is a Pareto front, uses global ref
+{
+  hv <- dominatedHypervolume(as.matrix(p), ref) # compute hypervolume
+  cat("hypervolume=", hv, "\n")
+}
+# ----------------------------------------------------
+
+methods <- c(
+  "mco::nsga2", "ecr::nsga2", "ecr::smsemoa", "ecr:asemoa",
+  "reference", "aspiration"
+)
+cat("run ", methods[1], "\n")
+set.seed(Seed)
+s1 <- mco::nsga2(
+  fn = ieval, idim = 5, odim = m,
+  lower.bounds = lower, upper.bounds = upper, # bounds
+  popsize = Pop, generations = Gen
+)
+p1 <- s1$value[s1$pareto.optimal, ]
+showhv(p1)
+p1 <- o1(f1(p1)) # Pareto front: f1,f2
+
+cat("run ", methods[2], "\n")
+set.seed(Seed)
+s2 <- ecr::nsga2(
+  fitness.fun = ieval, minimize = TRUE, n.objectives = m,
+  n.dim = D, lower = lower, upper = upper, mu = Pop,
+  terminators = list(stopOnIters(Gen))
+)
+p2 <- s2$pareto.front # convert to matrix
+showhv(p2)
+p2 <- o1(f1(p2)) # Pareto front: f1,f2
+
+cat("run ", methods[3], "\n")
+set.seed(Seed)
+s3 <- smsemoa(
+  fitness.fun = ieval, minimize = TRUE, n.objectives = m,
+  n.dim = D,
+  lower = lower, upper = upper, mu = Pop, ref.point = ref,
+  terminators = list(stopOnIters(Gen))
+)
+p3 <- s3$pareto.front # convert to matrix
+showhv(p3)
+p3 <- o1(f1(p3)) # Pareto front: f1,f2
+
+cat("run ", methods[4], "\n")
+set.seed(Seed)
+# set the aspiration set (in this case, Pop points are used):
+# basic aspiration with 2 lines and 1 inflection point
+p0 <- matrix(ncol = Pop, nrow = m)
+half1 <- round(Pop / 2)
+half2 <- Pop - half1 # for 2 sequences
+p0[1, ] <- c(
+  seq(-5000, -30000, length.out = half1),
+  seq(-30000, -45000, length.out = half2)
+)
+p0[2, ] <- c(
+  seq(0, 30, length.out = half1),
+  seq(30, 100, length.out = half2)
+)
+s4 <- asemoa(
+  fitness.fun = ieval, minimize = TRUE, n.objectives = m,
+  n.dim = D, aspiration = p0,
+  lower = lower, upper = upper, mu = Pop,
+  terminators = list(stopOnIters(Gen))
+)
+p4 <- s4$pareto.front # convert to matrix
+showhv(p4)
+p4 <- o1(f1(p4)) # Pareto front: f1,f2
+```
+
+```{r}
+# pdf("bagprices-pareto.pdf")
+par(mar = c(4.0, 4.0, 0.1, 0.1)) # set pdf margins
+xlim <- c(-1, 45000)
+ylim <- c(-1, 141) # plot x and y limits
+plot(p1, xlim = xlim, ylim = ylim, xlab = "f1", ylab = "f2", type = "n")
+col <- c(paste("gray", round(seq(1, 75, length.out = 5)), sep = ""), "black")
+pch <- c(1:3, 5, 4, 18) # types of points used
+# plot the 4 Pareto fronts:
+lines(p1, type = "b", cex = 0.5, lwd = 2, lty = 1, pch = pch[1], col = col[1])
+lines(p2, type = "b", cex = 0.5, lwd = 2, lty = 2, pch = pch[2], col = col[2])
+lines(p3, type = "b", cex = 0.5, lwd = 2, lty = 3, pch = pch[3], col = col[3])
+lines(p4, type = "b", cex = 0.5, lwd = 2, lty = 4, pch = pch[4], col = col[4])
+# show reference point:
+points(ref[1], ref[2], pch = "X", cex = 1.0, col = col[5])
+abline(v = ref[1], col = col[5])
+abline(h = ref[2], col = col[5])
+# show aspiration set
+p0 <- t(p0)
+p0 <- f1(p0)
+lines(p0, type = "b", cex = 1.0, lwd = 1, lty = 1, pch = pch[6], col = col[6])
+legend("bottomright", methods,
+  lwd = c(rep(2, 4), 1, 1),
+  pch = pch, lty = c(1:4, 1, 1), col = col
+)
+# dev.off()
+```
+
+```{r}
+### fes1-pareto.R file ###
+
+# source("mo-tasks.R") # load multi-optimization tasks
+
+library(mco) # load dominatedHypervolume
+library(ecr) # load nsga2, smsemoa
+# comment this line if you cannot install MaOEA
+library(MaOEA) # load optimMaOEA
+library(tictoc) # load tic and toc
+
+# --- FES1 real value task (common setup):
+m <- 2 # two objectives
+D <- 8 # dimension
+Pop <- 20 # population size
+Gen <- 100 # maximum number of generations (stop criterion)
+lower <- rep(0, D)
+upper <- rep(1, D) # lower and upper
+Seed <- 12345 # random seed
+ref <- c(2.5, 1.5) # reference point: used by the hypervolume
+runs <- 20 # total number of execution runs
+
+# auxiliary functions --------------------------------
+# function that sorts m according to 1st column
+o1 <- function(m) { # m is a matrix
+  return(m[order(m[, 1]), ])
+}
+
+# wilcox estimated median and confidence intervals:
+wmedian <- function(x, level = 0.95) # x is a vector
+{ # ignore wilcox.test warnings if they appear
+  wx <- suppressWarnings(wilcox.test(x,
+    conf.level = level,
+    conf.int = TRUE, alternative = "two.sided", correct = TRUE
+  ))
+  # use median if constant data in x:
+  if (is.nan(wx$estimate)) wx$estimate <- median(x)
+  wx$conf.int[is.nan(wx$conf.int)] <- c(wx$estimate, wx$estimate)
+  lint <- wx$estimate - wx$conf.int[1] # low conf. int. value
+  uint <- wx$conf.int[2] - wx$estimate # upper c.i. value
+  return(c(wx$estimate, lint, uint)) # median,lower c.i.,upper c.i.
+}
+
+# create a vertical averaging curve with vsamples on x-axis:
+#   Pareto is a vector list with runs results
+#   xlim and ylim are the plot x-axis and y-axis limits
+#   samples is the number of x-axis samples
+vmedian <- function(curves, xlim, ylim, samples = 15) {
+  # target x-axis equally spaced range:
+  xout <- seq(xlim[1], xlim[2], length.out = samples)
+  m <- matrix(nrow = length(curves), ncol = samples)
+
+  for (i in 1:length(curves)) # cycle all curves
+  {
+    # interpolate each curve to have points at xout values
+    # (assumes min f1 and min f2 goals)
+    acurve <- suppressWarnings(approx(curves[[i]][, 1],
+      curves[[i]][, 2],
+      xout = xout, yleft = ylim[2], yright = ylim[1]
+    ))
+    m[i, ] <- acurve$y # update the curve
+  }
+  vmed <- matrix(nrow = 4, ncol = samples)
+  vmed[1, ] <- xout # first row
+  # fill other rows with median,lower conf.int,upper conf.int
+  for (j in 1:samples) # vertical average
+  {
+    vmed[2:4, j] <- wmedian(m[, j])
+  }
+  return(vmed) # vertical median curve
+}
+
+# plot a vertical confidence interval bar (from file compare.R):
+#   x are the x-axis points
+#   ylower and yupper are the lower and upper y-axis points
+#   ... means other optional plot parameters (lty, etc.)
+confbar <- function(x, ylower, yupper, K = 100, ...) {
+  segments(x - K, yupper, x + K, ...)
+  segments(x - K, ylower, x + K, ...)
+  segments(x, ylower, x, yupper, ...)
+}
+
+# methods <- c("nsga2", "smsemoa", "nsga3")
+# methods=c("nsga2","smsemoa","nsga3") # uncomment if no MaOEA
+methods <- c("nsga2", "smsemoa")
+nm <- length(methods) # shorter variable
+
+# wrapper function that runs a MOEA, returns a Pareto front
+moeatest <- function(method, fn, m, D, Pop, ref, lower, upper, Gen) {
+  if (method == "nsga2") { # NSGA-II
+    s <- ecr::nsga2(
+      fitness.fun = fn, minimize = TRUE, n.objectives = m,
+      n.dim = D, lower = lower, upper = upper, mu = Pop,
+      terminators = list(stopOnIters(Gen))
+    )
+    # convert to a f1 sorted matrix:
+    return(as.matrix(o1(s$pareto.front)))
+  } else if (method == "smsemoa") { # SMS-EMOA
+    s <- smsemoa(
+      fitness.fun = fn, minimize = TRUE, n.objectives = m, n.dim = D,
+      lower = lower, upper = upper, mu = Pop, ref.point = ref,
+      terminators = list(stopOnIters(Gen))
+    )
+    # convert to a f1 sorted matrix:
+    return(as.matrix(o1(s$pareto.front)))
+  }
+  # comment this "else if" block if MaOEA is not installed -
+  else if (method == "nsga3") # SBX and polynomial mutation
+    { # NSGA-III
+      # define the initial random population:
+      pop <- matrix(runif(Pop * D, min = lower[1], max = upper[1]), nrow = D)
+      # control list NSGAIII defaults: pcx=1.0, pmut=1/D
+      C <- list(crossoverProbability = 1.0, mutationProbability = 1 / D)
+      s <- optimMaOEA(
+        x = pop, fun = fes1, solver = NSGA3, nObjective = m,
+        nGeneration = Gen, seed = Seed, control = C
+      )
+      # convert to a f1 sorted matrix:
+      return(as.matrix(o1(t(s$y))))
+    }
+  # end of #else if" block ---------------------------------
+}
+
+# execute several runs of a MOEA optimization:
+runtest <- function(runs, Seed, method, fn, m, D, Pop, ref, lower, upper, Gen) {
+  set.seed(Seed) # set for replicability
+  s <- sample(1:Seed, runs) # seed for each run
+  res <- vector("list", runs)
+  tic()
+  for (i in 1:runs)
+  {
+    set.seed(s[i]) # seed for the run
+    Pareto <- moeatest(method, fn, m, D, Pop, ref, lower, upper, Gen)
+    res[[i]] <- Pareto
+  }
+  toc()
+  return(res)
+}
+
+res <- vector("list", runs) # store all results in res
+hv <- matrix(nrow = nm, ncol = runs) # hypervolume results
+for (i in 1:nm)
+{
+  cat("execute ", runs, "runs with ", methods[i], "...\n")
+  res[[i]] <- runtest(
+    runs, Seed, methods[i], fes1, m, D, Pop, ref, lower,
+    upper, Gen
+  )
+  # store all hypervolume run results for methods[i]:
+  hv[i, ] <- unlist(lapply(res[[i]], dominatedHypervolume, ref))
+  # show hypervolume median and confidence intervals:
+  wm <- round(wmedian(hv[i, ]), 2) # median and confidence intervals
+  cat("median hypervolume: ", wm[1], " +- (",
+    wm[2], ",", wm[3], ")\n",
+    sep = ""
+  )
+}
+
+xlim <- c(0.7, 5) # set manually for fes1
+ylim <- c(0, 1.5) # set manually for fes1
+```
+
+
+```{r}
+# create pdf with all Pareto runs for all methods
+# pdf("fes1-all.pdf")
+par(mar = c(4.0, 4.0, 0.1, 0.1))
+# set an empty plot frame:
+plot(res[[1]][[1]],
+  xlim = xlim, ylim = ylim, type = "n",
+  xlab = "f1", ylab = "f2"
+)
+col <- paste("gray", round(seq(1, 50, length.out = nm)))
+# col=c("black","blue","red") # if you prefer color
+lwd <- c(1, 1, 2)
+for (i in 1:nm) # cycle methods
+{
+  for (r in 1:runs) # cycle runs
+  { # plot each Pareto curve for each run
+    lines(res[[i]][[r]], type = "l", col = col[i], lty = i, lwd = lwd[i])
+  }
+}
+legend("topright", methods, col = col, lty = 1:nm, lwd = lwd)
+# dev.off()
+
+# create pdf to compare Pareto front curves:
+#   method proposed in (Cortez et al., 2020)
+# pdf("fes1-median.pdf")
+par(mar = c(4.0, 4.0, 0.1, 0.1))
+# set an empty plot frame:
+plot(res[[1]][[1]],
+  xlim = xlim, ylim = ylim, type = "n",
+  xlab = "f1", ylab = "f2"
+)
+samples <- 15
+pch <- 1:nm
+lwd <- c(2, 2, 2)
+K <- diff(range(xlim)) / samples / 4 # 1/4 of the x-axis sample spacing
+for (i in 1:nm)
+{
+  V <- vmedian(res[[i]], xlim, ylim, samples = samples)
+  # if needed clean artificially generated points (in extremes)
+  if (i == 2) {
+    ix <- 6:(samples - 1)
+  } # set manually
+  else if (i == 3) {
+    ix <- 1:6
+  } # set manually
+  else {
+    ix <- 1:samples
+  } # all x-axis samples
+  lines(V[1, ix], V[2, ix], type = "b", pch = pch[i], col = col[i], lwd = lwd[i])
+  # plotH(V[1,ix],V[2,ix],V[3,ix],V[4,ix],col=col[i])
+  confbar(V[1, ix], V[2, ix] - V[3, ix], V[2, ix] + V[4, ix], K = K, col = col[i])
+}
+legend("topright", methods, col = col, lty = 1, lwd = lwd, pch = pch)
+# dev.off()
+```
