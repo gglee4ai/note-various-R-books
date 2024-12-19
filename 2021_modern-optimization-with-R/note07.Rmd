@@ -1,0 +1,789 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+## Traveling Salesman Problem
+
+```{r}
+### perm.R file ###
+
+#-- functions to handle permutation optimization tasks --
+
+library(ecr)
+
+# operators for permutation solutions:
+
+### mutation operators:
+exchange <- function(s, N = length(s)) {
+  p <- sample(1:N, 2) # select two positions
+  temp <- s[p[1]] # swap values
+  s[p[1]] <- s[p[2]]
+  s[p[2]] <- temp
+  return(s)
+}
+
+insertion <- function(s, N = length(s), p = NA, i = NA) {
+  if (is.na(p)) p <- sample(1:N, 1) # select a position
+  I <- setdiff(1:N, p) # ALL except p
+  if (is.na(i)) i <- sample(I, 1) # select random place
+  if (i > p) i <- i + 1 # need to produce a change
+  I1 <- which(I < i) # first part
+  I2 <- which(I >= i) # last part
+  s <- s[c(I[I1], p, I[I2])] # new solution
+  return(s)
+}
+
+displacement <- function(s, N = length(s)) {
+  p <- c(1, N)
+  # select random tour different than s
+  while (p[1] == 1 && p[2] == N) p <- sort(sample(1:N, 2))
+  I <- setdiff(1:N, p[1]:p[2]) # ALL except p
+  i <- sample(I, 1) # select random place
+  I1 <- which(I < i) # first part
+  I2 <- which(I >= i) # last part
+  s <- s[c(I[I1], p[1]:p[2], I[I2])]
+  return(s)
+}
+
+scramble <- function(s, N = length(s)) {
+  p <- c(1, N)
+  # select random tour different than s
+  while (p[1] == 1 && p[2] == N) p <- sort(sample(1:N, 2))
+  # scramble p
+  scr <- sample(p[1]:p[2], p[2] - p[1] + 1)
+  I <- setdiff(1:N, p[1]:p[2]) # ALL except p
+  I1 <- which(I < p[1]) # first part
+  I2 <- which(I > p[2]) # last part
+  s <- s[c(I[I1], scr, I[I2])]
+  return(s)
+}
+
+### crossover operators:
+# partially matched crossover (PMX) operator:
+# m is a matrix with 2 parent x ordered solutions
+pmx <- function(m) {
+  N <- ncol(m)
+  p <- sample(1:N, 2) # two cutting points
+  c <- m # children
+  for (i in p[1]:p[2])
+  { # rearrange:
+    c[1, which(c[1, ] == m[2, i])] <- c[1, i]
+    # crossed section:
+    c[1, i] <- m[2, i]
+    # rearrange:
+    c[2, which(c[2, ] == m[1, i])] <- c[2, i]
+    # crossed section:
+    c[2, i] <- m[1, i]
+  }
+  return(c)
+}
+
+# order crossover (OX) operator:
+# m is a matrix with 2 parent x ordered solutions
+ox <- function(m) {
+  N <- ncol(m)
+  p <- sort(sample(1:N, 2)) # two cutting points
+  c <- matrix(rep(NA, N * 2), ncol = N)
+  # keep selected section:
+  c[, p[1]:p[2]] <- m[, p[1]:p[2]]
+  # rotate after cut 2 (p[2]):
+  I <- ((p[2] + 1):(p[2] + N))
+  I <- ifelse(I <= N, I, I - N)
+  a <- m[, I]
+  # fill remaining genes:
+  a1 <- setdiff(a[2, ], c[1, p[1]:p[2]])
+  a2 <- setdiff(a[1, ], c[2, p[1]:p[2]])
+  I2 <- setdiff(I, p[1]:p[2])
+  c[, I2] <- rbind(a1, a2)
+  return(c)
+}
+
+# auxiliary functions that:
+# return same argument OR
+#  population or fitness fields (if Lamarck evaluation)
+pop_eF <- function(pop, fitness) {
+  if (!is.list(fitness)) {
+    return(pop)
+  } else # is.list (Lamarck)
+  {
+    for (i in 1:length(pop)) {
+      pop[[i]] <- fitness[, i]$sol
+    }
+    return(pop)
+  }
+}
+fit_eF <- function(fitness) {
+  if (!is.list(fitness)) {
+    return(fitness)
+  } else # is.list (Lamarck)
+  {
+    res <- matrix(ncol = ncol(fitness), nrow = 1)
+    for (i in 1:ncol(fitness)) res[, i] <- fitness[, i]$eval
+    return(res)
+  }
+}
+
+# evolutionary algorithm with Lamarckian optimization
+#  uses the same arguments as ecr():
+#  mu -- population size (if numeric)
+#     or initial population (if vector list)
+#  perm -- the maximum integer size of the permutation
+#  trace -- if >0, then the best is shown every trace iter.
+#  fitness.fun might perform a Lamarckian change, if it
+#    does, then it should return a list with $eval and $sol
+eal <- function(fitness.fun, mu, lambda, perm = perm,
+                p.recomb = 0.7, p.mut = 0.3, n.elite = 0L, maxit, trace = maxit) {
+  # control object: fitness.fun,mutation,crossover,selection
+  control <- initECRControl(fitness.fun = fitness.fun, n.objectives = 1)
+  control <- registerECROperator(control, "mutate", mutInsertion)
+  control <- registerECROperator(control, "recombine", recOX)
+  # use roulette wheel for selection of individuals and parents:
+  control <- registerECROperator(
+    control, "selectForSurvival",
+    selTournament
+  )
+  control <- registerECROperator(
+    control, "selectForMating",
+    selTournament
+  )
+
+  if (is.numeric(mu)) {
+    pop <- genPerm(mu, perm)
+  } # initial population
+  else {
+    pop <- mu
+    mu <- length(mu)
+  } # use mu as initial population
+  eF <- evaluateFitness(control, pop) # evaluation
+  pop <- pop_eF(pop, eF) # update (if Lamarck)
+  fitness <- fit_eF(eF) # update (if Lamarck), matrix (1 x mu)
+
+  if (trace > 0) cat("initial pop. best:", min(fitness), "\n")
+  for (i in seq_len(maxit)) # main evolutionary cycle
+  {
+    # sample lambda individuals:
+    idx <- sample(1:mu, lambda)
+    # create and evaluate offspring:
+    fitidx <- matrix(fitness[, idx], ncol = lambda)
+    offspring <- generateOffspring(control, pop[idx],
+      fitness = fitidx,
+      lambda = lambda, p.recomb = 0.7, p.mut = 0.3
+    )
+    fitness.o <- evaluateFitness(control, offspring)
+    offspring <- pop_eF(offspring, fitness.o) # update (if Lamarck)
+    fitness.o <- fit_eF(fitness.o) # get (if Lamarck)
+    # selection of best solutions:
+    sel <- replaceMuCommaLambda(control, pop, offspring, fitness,
+      fitness.o,
+      n.elite = n.elite
+    )
+    pop <- sel$population # update population
+    fitness <- sel$fitness # update fitness
+    if (i %% trace == 0) cat("gen:", i, "best:", min(fitness), "\n")
+  }
+  # pop is a vector list of size mu, fit is a matrix (1 x mu)
+  return(list(pop = pop, fit = fitness))
+}
+```
+
+```{r}
+### tsp.R file ###
+
+library(TSP) # load TSP package
+library(RCurl) # load RCurl package
+library(ecr) # load ecr package
+# source("perm.R") # load permutation operators
+
+# get Qatar - 194 cities TSP instance:
+txt <- getURL("https://www.math.uwaterloo.ca/tsp/world/qa194.tsp")
+# simple parse of txt object, removing header and last line:
+txt <- strsplit(txt, "NODE_COORD_SECTION") # split text into 2 parts
+txt <- txt[[1]][2] # get second text part
+txt <- strsplit(txt, "EOF") # split text into 2 parts
+txt <- txt[[1]][1] # get first text part
+# save data into a simple .csv file, sep=" ":
+cat(txt, file = "qa194.csv")
+# read the TSP format into Data
+# (first row is empty, thus header=TRUE)
+# get city Cartesian coordinates
+
+Data <- read.table("qa194.csv", sep = " ")
+Data <- Data[, 3:2] # longitude and latitude
+names(Data) <- c("x", "y") # x and y labels
+# number of cities
+```
+
+```{r}
+# distance between two cities (EUC_2D-norm)
+# Euclidean distance rounded to whole number
+D <- dist(Data, upper = TRUE)
+D[1:length(D)] <- round(D[1:length(D)])
+# create TSP object from D:
+TD <- TSP(D)
+
+set.seed(12345) # for replicability
+cat("2-opt run:\n")
+PTM <- proc.time() # start clock
+R1 <- solve_TSP(TD, method = "2-opt")
+sec <- (proc.time() - PTM)[3] # get seconds elapsed
+print(R1) # show optimum
+cat("time elapsed:", sec, "\n")
+
+MAXIT <- 50000 # maximum number of evaluations
+Methods <- c("SANN", "EA", "EA2", "LEA") # comparison of 4 methods
+
+RES <- matrix(nrow = MAXIT, ncol = length(Methods))
+MD <- as.matrix(D)
+N <- nrow(MD)
+
+# overall distance of a tour (evaluation function):
+tour <- function(s) # s is a solution (permutation)
+{ # compute tour length:
+  EV <<- EV + 1 # increase evaluations
+  s <- c(s, s[1]) # start city is also end city
+  res <- 0
+  for (i in 2:length(s)) res <- res + MD[s[i], s[i - 1]]
+  # store in global memory the best values:
+  if (res < BEST) BEST <<- res
+  if (EV <= MAXIT) F[EV] <<- BEST
+  # only for hybrid method:
+  # return tour
+  return(res)
+}
+
+# Lamarckian evaluation function:
+#  uses 2-opt to improve solution s, returns a list with:
+#  eval - the tour for improved solution
+#  sol  - the improved solution
+ltour2opt <- function(s) {
+  EV <<- EV + 1 # increase evaluations
+  # improve s using "2-opt" method:
+  s2 <- solve_TSP(TD, method = "2-opt", control = list(tour = s))
+  res <- attr(s2, "tour_length") # solve_TSP computes the tour
+  if (res < BEST) BEST <<- res
+  if (EV <= MAXIT) F[EV] <<- BEST
+  return(list(eval = res, sol = as.numeric(s2)))
+}
+
+Trace <- 1000 # show at the console the optimization evolution
+```
+
+```{r}
+cat("SANN run:\n")
+set.seed(12345) # for replicability
+s <- sample(1:N, N) # initial solution
+EV <- 0
+BEST <- Inf
+F <- rep(NA, MAXIT) # reset these vars.
+C <- list(maxit = MAXIT, temp = 2000, trace = TRUE, REPORT = Trace)
+PTM <- proc.time() # start clock
+SANN <- optim(s, fn = tour, gr = insertion, method = "SANN", control = C)
+sec <- (proc.time() - PTM)[3] # get seconds elapsed
+cat("time elapsed:", sec, "best tour:", F[MAXIT], "\n")
+RES[, 1] <- F
+```
+
+```{r}
+# EA: simple permutation based evolutionary algorithm
+cat("EA run:\n")
+set.seed(12345) # for replicability
+EV <- 0
+BEST <- Inf
+F <- rep(NA, MAXIT) # reset these vars.
+popSize <- 30
+lambda <- round(popSize / 2)
+Eli <- 1
+maxit <- ceiling((MAXIT - popSize) / (lambda - 1))
+
+PTM <- proc.time() # start clock
+EA <- eal(
+  fitness.fun = tour, mu = popSize, lambda = lambda,
+  perm = N, n.elite = Eli, # elitism
+  maxit = maxit, trace = Trace
+)
+sec <- (proc.time() - PTM)[3] # get seconds elapsed
+cat("time elapsed:", sec, "best tour:", F[MAXIT], "\n")
+RES[, 2] <- F
+```
+
+```{r}
+# EA2: initial 2-opt search + EA
+cat("EA2 run:\n")
+set.seed(12345) # for replicability
+EV <- 0
+BEST <- Inf
+F <- rep(NA, MAXIT) # reset these vars.
+maxit <- ceiling((MAXIT - popSize) / (lambda - 1))
+PTM <- proc.time() # start clock
+# apply 2-opt local search to initial population:
+pop <- genPerm(popSize, N) # create random population
+control <- initECRControl(fitness.fun = ltour2opt, n.objectives = 1)
+eF <- evaluateFitness(control, pop)
+pop <- pop_eF(pop, eF) # update population
+# run standard evolutionary algorithm
+EA2 <- eal(
+  fitness.fun = tour, mu = pop, lambda = lambda,
+  perm = N, n.elite = Eli, # elitism
+  maxit = maxit, trace = Trace
+)
+sec <- (proc.time() - PTM)[3] # get seconds elapsed
+cat("time elapsed:", sec, "best tour:", F[MAXIT], "\n")
+RES[, 3] <- F
+```
+
+```{r}
+cat("LEA run:\n")
+popSize <- 30
+lambda <- round(popSize / 2)
+Eli <- 1
+set.seed(12345) # for replicability
+EV <- 0
+BEST <- Inf
+F <- rep(NA, MAXIT) # reset these vars.
+maxit <- ceiling((MAXIT - popSize) / (lambda - 1))
+PTM <- proc.time() # start clock
+LEA <- eal(
+  fitness.fun = ltour2opt, mu = popSize, lambda = lambda,
+  perm = N, n.elite = Eli, # elitism
+  maxit = maxit, trace = Trace
+)
+sec <- (proc.time() - PTM)[3] # get seconds elapsed
+cat("time elapsed:", sec, "best tour:", F[MAXIT], "\n")
+RES[, 4] <- F
+```
+
+```{r}
+# create PDF with comparison:
+# pdf("qa194-opt.pdf",paper="special")
+par(mar = c(4.0, 4.0, 0.1, 0.1))
+X <- seq(1, MAXIT, length.out = 200)
+ylim <- c(min(RES) - 50, max(RES))
+plot(X, RES[X, 1],
+  ylim = ylim, type = "l", lty = 4, lwd = 2,
+  xlab = "evaluations", ylab = "tour distance"
+)
+lines(X, RES[X, 2], type = "l", lty = 3, lwd = 2)
+lines(X, RES[X, 3], type = "l", lty = 2, lwd = 2)
+lines(X, RES[X, 4], type = "l", lty = 1, lwd = 2)
+legend("topright", Methods, lwd = 2, lty = 4:1)
+# dev.off()
+```
+
+```{r}
+# create 3 PDF files with best tours:
+# pdf("qa194-2-opt.pdf",paper="special")
+par(mar = c(0.0, 0.0, 0.0, 0.0))
+plot(Data[c(R1[1:N], R1[1]), ], type = "l", xaxt = "n", yaxt = "n")
+# dev.off()
+```
+
+```{r}
+# pdf("qa194-ea.pdf",paper="special")
+par(mar = c(0.0, 0.0, 0.0, 0.0))
+b <- EA$pop[[which.min(EA$fit)]]
+plot(Data[c(b, b[1]), ], type = "l", xaxt = "n", yaxt = "n")
+# dev.off()
+```
+
+```{r}
+# pdf("qa194-lea.pdf",paper="special")
+par(mar = c(0.0, 0.0, 0.0, 0.0))
+b <- LEA$pop[[which.min(LEA$fit)]]
+plot(Data[c(b, b[1]), ], type = "l", xaxt = "n", yaxt = "n")
+# dev.off()
+```
+
+```{r}
+### tsp2.R file ###
+# this file assumes that tsp.R has already been executed
+
+# library(rgeos) # get gArea function
+library(sf)
+
+N2 <- 25 # lets consider just 25 cities
+
+# creates a polygon (rgeos package) object from TSP data
+poly <- function(data) {
+  poly <- ""
+  sep <- ", "
+  for (i in 1:nrow(data))
+  {
+    if (i == nrow(data)) sep <- ""
+    poly <- paste(poly, paste(data[i, ], collapse = " "), sep, sep = "")
+  }
+  poly <- paste("POLYGON((", poly, "))", collapse = "")
+  poly <- readWKT(poly) # WKT format to polygon
+}
+
+# new evaluation function: area of polygon
+# area=function(s) return(st_area(poly(Data[c(s,s[1]),])))
+
+# Creates a polygon (sf package) object from TSP data
+library(sf)
+
+poly <- function(data) {
+  # `data`는 각 행이 좌표(x, y)를 나타내는 데이터프레임이어야 합니다
+
+  # 다각형을 닫기 위해 첫 번째 점을 끝에 추가
+  coords <- rbind(data, data[1, ])
+
+  # 좌표를 matrix 형태로 변환
+  coords_matrix <- as.matrix(coords)
+
+  # sf polygon 객체 생성
+  polygon <- st_polygon(list(coords_matrix))
+
+  # polygon을 sf 객체로 변환 (필요 시 CRS 지정)
+  polygon_sf <- st_sfc(polygon, crs = 4326) # 좌표계 설정 (예: WGS84)
+
+  return(polygon_sf)
+}
+
+
+area <- function(s) {
+  # 다각형 객체 생성
+  polygon <- st_polygon(list(as.matrix(Data[c(s, s[1]), ])))
+  # 면적 계산
+  return(st_area(polygon))
+}
+
+# new data with N2 cities:
+Data2 <- Data[1:N2, ]
+D2 <- dist(Data2, upper = TRUE)
+D2[1:length(D2)] <- round(D2[1:length(D2)])
+# create TSP object from D:
+TD2 <- TSP(D2)
+set.seed(12345) # for replicability
+R2 <- solve_TSP(TD2, method = "2-opt")
+cat("area of 2-opt TSP tour:", area(R2), "\n")
+
+# plot area of 2-opt:
+pdf("qa-2opt-area.pdf", paper = "special")
+par(mar = c(0.0, 0.0, 0.0, 0.0))
+PR1 <- poly(Data[c(R2, R2[1]), ])
+plot(PR1, col = "gray")
+dev.off()
+
+# EA:
+cat("EA run for TSP area:\n")
+set.seed(12345) # for replicability
+pSize <- 30
+lambda <- round(pSize / 2)
+maxit <- 40
+Eli <- 1
+PTM <- proc.time() # start clock
+OEA <- eal(
+  fitness.fun = area, mu = popSize, lambda = lambda,
+  perm = N2, n.elite = Eli, # elitism
+  maxit = maxit, trace = maxit
+)
+sec <- (proc.time() - PTM)[3] # get seconds elapsed
+bi <- which.min(OEA$fit)
+b <- OEA$pop[[bi]]
+cat("best fitness:", OEA$fit[1, bi], "time elapsed:", sec, "\n")
+```
+
+```{r}
+# plot area of EA best solution:
+# pdf("qa-ea-area.pdf",paper="special")
+par(mar = c(0.0, 0.0, 0.0, 0.0))
+PEA <- poly(Data[c(b, b[1]), ])
+plot(PEA, col = "gray")
+lines(Data[c(b, b[1]), ], lwd = 2)
+# dev.off()
+```
+
+## 7.3 Time Series Forecasting
+
+```{r}
+### tsf.R file ###
+
+# get sunspot yearly series:
+url <- "http://www.sidc.be/silso/DATA/SN_y_tot_V2.0.txt"
+series <- read.table(url)
+# lets consider data from the 1700-2019 years:
+# lets consider column 2: sunspot numbers
+series <- series[1:320, 2]
+# save to CSV file, for posterior usage (if needed)
+write.table(series,
+  file = "sunspots.csv",
+  col.names = FALSE, row.names = FALSE
+)
+
+L <- length(series) # series length
+forecasts <- 32 # number of 1-ahead forecasts
+outsamples <- series[(L - forecasts + 1):L] # out-of-samples
+sunspots <- series[1:(L - forecasts)] # in-samples
+
+# mean absolute error of residuals
+maeres <- function(residuals) mean(abs(residuals))
+
+# fit best ARIMA model:
+INIT <- 10 # initialization period (no error computed before)
+library(forecast) # load forecast package
+arima <- auto.arima(sunspots) # detected order is AR=2, MA=1
+print(arima) # show ARIMA model
+cat(
+  "arima fit MAE=",
+  maeres(arima$residuals[INIT:length(sunspots)]), "\n"
+)
+```
+
+## 7.4 Wine Quality Classification
+
+```{r}
+### wine-quality.R file ###
+
+library(rminer) # load rminer package
+library(mco) # load mco package
+
+# load wine quality dataset directly from UCI repository:
+file <- "http://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-white.csv"
+d <- read.table(file = file, sep = ";", header = TRUE)
+
+# convert the output variable into 2 classes of wine:
+# "low" <- 3,4,5 or 6; "high" <- 7, 8 or 9
+d$quality <- cut(d$quality, c(1, 6, 10), c("low", "high"))
+
+# to speed up the demonstration, only 25% of the data is used:
+n <- nrow(d) # total number of samples
+ns <- round(n * 0.25) # select a quarter of the samples
+set.seed(12345) # for replicability
+ALL <- sample(1:n, ns) # contains 25% of the index samples
+w <- d[ALL, ] # new wine quality data.frame
+# show the attribute names:
+cat("attributes:", names(w), "\n")
+cat("output class distribution (25% samples):\n")
+print(table(w$quality)) # show distribution of classes
+
+# save dataset to a local CSV file:
+write.table(w, "wq25.csv", col.names = TRUE, row.names = FALSE, sep = ";")
+```
+
+```{r}
+# holdout split into training (70%) and test data (30%):
+H <- holdout(w$quality, ratio = 0.7)
+cat("nr. training samples:", length(H$tr), "\n")
+cat("nr. test samples:", length(H$ts), "\n")
+# save to file the holdout split index:
+save(H, file = "wine-H.txt", ascii = TRUE)
+
+output <- ncol(w) # output target index (last column)
+maxinputs <- output - 1 # number of maximum inputs
+
+# auxiliary functions:
+# rescale x from [0,1] to [min,max] domain:
+transf <- function(x, min, max) {
+  return(x * (max - min) + min)
+}
+# decode the x genome into the model hyperparameters:
+decode <- function(x) {
+  # 4 xgboost hyperparameters for default "gbtree":
+  nrounds <- round(transf(x[1], 1, 200)) # [1,200]
+  eta <- x[2] # [0.0,1.0]
+  gamma <- transf(x[3], 0, 10) # [0,10]
+  max_depth <- round(transf(x[4], 0, 12)) # {0,...,12}
+  return(c(nrounds, eta, gamma, max_depth))
+}
+
+# evaluation function (requires some computation):
+eval <- function(x) {
+  # read input features: from position 1 to maxinputs
+  features <- round(x[1:maxinputs]) # 0 or 1 vector
+  inputs <- which(features == 1) # indexes with 1 values
+  # use first feature if inputs is empty
+  if (length(inputs) == 0) inputs <- 1
+  J <- c(inputs, output) # attributes
+  k3 <- c("kfold", 3, 123) # internal 3-fold validation
+  # read hyperparameters:
+  hpar <- decode(x[(maxinputs + 1):length(x)])
+  M <- suppressWarnings(try(
+    mining(quality ~ ., w[H$tr, J],
+      method = k3,
+      model = "xgboost", nrounds = hpar[1],
+      eta = hpar[2], gamma = hpar[3], max_depth = hpar[4]
+    ),
+    silent = TRUE
+  ))
+  # AUC for the internal 3-fold cross-validation:
+  if (class(M) == "try-error") {
+    auc <- 0.5
+  } # worst auc
+  else {
+    auc <- as.numeric(mmetric(M, metric = "AUC"))
+  }
+  auc1 <- 1 - auc # maximization into minimization goal
+  ninputs <- length(inputs) # number of input features
+  EVALS <<- EVALS + 1 # update evaluations
+  if (EVALS == 1 || EVALS %% Psize == 0) { # show current evaluation:
+    cat(EVALS, " evaluations (AUC: ", round(auc, 2),
+      " nr.features:", ninputs, ")\n",
+      sep = ""
+    )
+  }
+  return(c(auc1, ninputs)) # 1-auc,ninputs
+}
+```
+
+```{r}
+# NSGAII multi-objective optimization:
+cat("NSGAII optimization:\n")
+m <- 2 # two objectives: AUC and number of input features
+hxgb <- 4 # number of hyperparameters for xgboost
+genome <- maxinputs + hxgb # genome length
+lower <- rep(0, genome)
+upper <- rep(1, genome)
+EVALS <<- 0 # global variable
+PTM <- proc.time() # start clock
+Psize <- 20 # population size
+s1 <- mco::nsga2(
+  fn = eval, idim = length(lower), odim = m,
+  lower.bounds = lower, upper.bounds = upper,
+  popsize = Psize, generations = 10
+)
+sec <- (proc.time() - PTM)[3] # get seconds elapsed
+cat("time elapsed:", sec, "\n")
+# save to file the optimized Pareto front:
+save(s1, file = "wine-s1.txt", ascii = TRUE)
+```
+
+```{r}
+### wineApp/app.R file ###
+
+library(shiny) # load shiny
+library(rminer) # load rminer
+
+#---  global variables ------
+# load the previously saved files
+# (the files are in the upper level "../" directory):
+w <- read.table("wq25.csv",
+  header = TRUE, sep = ";",
+  stringsAsFactors = TRUE
+)
+load("wine-H.txt") # loads into H the holdout index
+load("wine-s1.txt") # loads into s1 the Pareto front
+
+# global objects related with the data (w):
+output <- ncol(w) # output target index (last column)
+maxinputs <- output - 1 # number of maximum inputs
+Y <- w[H$ts, "quality"] # target test data
+
+# global objects related with the Pareto front (s1):
+po <- which(s1$pareto.optimal) # optimal points
+NP <- length(po) # number of Pareto front points
+# sort Pareto front according to f2 (number of features):
+i <- sort.int(s1$value[po, 2], index.return = TRUE)
+pareto <- s1$value[po[i$ix], ] # Pareto front f1,f2 values
+pop <- s1$par[po[i$ix], ] # Pareto solutions
+
+# User Interface (UI):
+ui <- fluidPage( # begin fluidPage
+  titlePanel("wineApp"), # title of the panel
+  sidebarLayout( # sidebar with input and outputs
+    position = c("right"), # put input at the right
+    sidebarPanel( # panel for input
+      numericInput(
+        inputId = "number",
+        label = paste("Pareto front point (1 to ", NP, "):", sep = ""),
+        min = 1, # minimum value
+        max = NP, # maximum value
+        step = 1, # select only integers
+        value = 1 # default value
+      )
+    ), # end sidebarPanel
+    mainPanel( # panel for outputs
+      h5("input features:"), # show fixed text
+      verbatimTextOutput("text1"),
+      h5("hyper parameters:"), # show fixed text
+      verbatimTextOutput("text2"),
+      splitLayout( # show horizontally 2 plots
+        cellWidths = 350, # enlarge plot size
+        plotOutput(outputId = "par"),
+        plotOutput(outputId = "roc")
+      ) # end splitLayout
+    ) # end mainPanel
+  ) # end sidebar
+) # end fluidPage
+
+# Server function:
+server <- function(input, output) {
+  # reactive component: return the selected model
+  #  (only executed once for each input$number change)
+  modelInput <- reactive({
+    selectmodel(input$number)
+  })
+  # output components:
+  output$text1 <- renderText({ # show inputs
+    S <- modelInput()
+    paste(S$ninputs)
+  })
+  output$text2 <- renderText({ # show hyperparameters
+    S <- modelInput()
+    paste(S$hpar)
+  })
+  output$par <- renderPlot({ # plot Pareto curve
+    plot(1 - pareto[, 1], pareto[, 2],
+      xlab = "AUC",
+      ylab = "nr. features", type = "b", lwd = 2,
+      main = "Pareto curve:"
+    )
+    points(1 - pareto[input$number, 1], pareto[input$number, 2],
+      pch = "X", cex = 1.5
+    )
+  })
+  output$roc <- renderPlot({ # plot ROC curve
+    S <- modelInput()
+    mgraph(Y, S$P,
+      graph = "ROC", main = S$main,
+      Grid = 10, baseline = TRUE, leg = "xgboost"
+    )
+  })
+}
+
+# auxiliary functions:
+# rescale x from [0,1] to [min,max] domain:
+transf <- function(x, min, max) {
+  return(x * (max - min) + min)
+}
+# decode the x genome into the model hyperparameters:
+decode <- function(x) {
+  # 4 xgboost hyperparameters for default "gbtree":
+  nrounds <- round(transf(x[1], 1, 200)) # [1,200]
+  eta <- x[2] # [0.0,1.0]
+  gamma <- transf(x[3], 0, 10) # [0,10]
+  max_depth <- round(transf(x[4], 0, 12)) # {0,...,12}
+  return(c(nrounds, eta, gamma, max_depth))
+}
+# select from the Pareto front the classifier
+#  i - index of the sorted Pareto front
+selectmodel <- function(i) {
+  x <- pop[i, ] # selected genome
+  # decode the model:
+  features <- round(x[1:maxinputs])
+  inputs <- which(features == 1)
+  ninputs <- names(w)[inputs]
+  J <- c(inputs, output) # data attributes
+  hpar <- decode(x[(maxinputs + 1):length(x)])
+  if (pareto[i, 1] == 0.5) { # random classifier
+    P <- cbind(rep(1, length(Y)), rep(0, length(Y)))
+  } # predict "low"
+  else {
+    M <- fit(quality ~ ., w[H$tr, J],
+      model = "xgboost",
+      nrounds = hpar[1], eta = hpar[2],
+      gamma = hpar[3], max_depth = hpar[4]
+    )
+    P <- predict(M, w[H$ts, J]) # get xgboost predictions
+  }
+  auc <- mmetric(Y, P, metric = "AUC") # compute the AUC
+  main <- paste("test data ROC curve", " (AUC=",
+    round(auc, digits = 2), ")",
+    sep = ""
+  )
+  return(list(ninputs = ninputs, hpar = hpar, P = P, main = main))
+}
+
+# call to shinyApp (launches the app in browser):
+shinyApp(ui = ui, server = server)
+```
