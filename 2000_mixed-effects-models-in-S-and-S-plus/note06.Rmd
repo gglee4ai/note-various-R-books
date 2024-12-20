@@ -1,0 +1,257 @@
+---
+title: "note06"
+output: html_notebook
+---
+
+# 6 Nonlinear Mixed-Effects Models: Basic Concepts and Motivating Examples
+
+## 6.1 LME Models vs. NLME Models
+
+## 6.2 Indomethicin Kinetics
+
+```{r}
+library(nlme)
+```
+
+```{r}
+Indometh
+```
+
+```{r}
+plot(Indometh)
+```
+
+```{r}
+fm1Indom.nls <- nls(conc ~ SSbiexp(time, A1, lrc1, A2, lrc2),
+  data = Indometh
+)
+summary(fm1Indom.nls)
+```
+
+```{r}
+plot(fm1Indom.nls, Subject ~ resid(.), abline = 0)
+```
+
+```{r}
+fm1Indom.lis <- nlsList(conc ~ SSbiexp(time, A1, lrc1, A2, lrc2),
+  data = Indometh
+)
+summary(fm1Indom.lis)
+```
+
+```{r}
+plot(fm1Indom.lis, Subject ~ resid(.), abline = 0)
+```
+
+```{r}
+plot(intervals(fm1Indom.lis))
+```
+
+```{r}
+(fm1Indom.nlme <- nlme(fm1Indom.lis,
+  random = pdDiag(A1 + lrc1 + A2 + lrc2 ~ 1),
+  control = list(tolerance = 0.0001)
+))
+fm1Indom.nlme
+```
+
+```{r}
+fm2Indom.nlme <- update(fm1Indom.nlme,
+  random = pdDiag(A1 + lrc1 + A2 ~ 1)
+)
+fm2Indom.nlme
+```
+
+```{r}
+anova(fm1Indom.nlme, fm2Indom.nlme)
+```
+
+```{r}
+fm3Indom.nlme <- update(fm2Indom.nlme,
+  random = A1 + lrc1 + A2 ~ 1,
+  control = nlmeControl(
+    msMaxIter = 1000,
+    msMaxEval = 1000
+  )
+)
+fm3Indom.nlme
+```
+
+```{r}
+fm4Indom.nlme <-
+  update(fm3Indom.nlme,
+    random = pdBlocked(list(A1 + lrc1 ~ 1, A2 ~ 1))
+  )
+fm4Indom.nlme
+```
+
+```{r}
+anova(fm2Indom.nlme, fm4Indom.nlme)
+```
+
+```{r}
+AIC(fm1Indom.nlme, fm2Indom.nlme, fm3Indom.nlme, fm4Indom.nlme)
+```
+
+```{r}
+plot(fm4Indom.nlme, id = 0.05, adj = -1)
+```
+
+```{r}
+qqnorm(fm4Indom.nlme)
+```
+
+```{r}
+plot(augPred(fm4Indom.nlme, level = 0:1))
+```
+
+```{r, paged.print = FALSE}
+summary(fm4Indom.nlme)
+```
+
+## 6.3 Growth of Soybean Plants
+
+```{r}
+library(tidyverse)
+Soybean %>%
+  group_by(Plot) %>%
+  count() %>%
+  arrange(desc(n))
+```
+
+```{r, fig.asp=1}
+plot(Soybean, outer = ~ Year * Variety)
+```
+
+```{r}
+fm1Soy.lis <- nlsList(
+  weight ~ SSlogis(Time, Asym, xmid, scal),
+  data = Soybean
+)
+fm1Soy.lis
+```
+
+```{r}
+fm1Soy.nlme <- nlme(fm1Soy.lis)
+fm1Soy.nlme
+```
+
+```{r}
+plot(fm1Soy.nlme)
+```
+
+```{r}
+fm2Soy.nlme <- update(fm1Soy.nlme, weights = varPower())
+
+fm2Soy.nlme
+```
+
+```{r}
+anova(fm1Soy.nlme, fm2Soy.nlme)
+```
+
+```{r}
+plot(fm2Soy.nlme)
+```
+
+```{r}
+plot(ranef(fm2Soy.nlme, augFrame = TRUE), form = ~ Year * Variety, layout = c(3, 1))
+```
+
+```{r}
+soyFix <- fixef(fm2Soy.nlme)
+
+fm3Soy.nlme <-
+  update(fm2Soy.nlme,
+    fixed = Asym + xmid + scal ~ Year,
+    start = c(soyFix[1], 0, 0, soyFix[2], 0, 0, soyFix[3], 0, 0)
+  )
+fm3Soy.nlme
+```
+
+```{r}
+anova(fm3Soy.nlme)
+```
+
+```{r}
+anova(fm2Soy.nlme, fm3Soy.nlme)
+```
+
+```{r, paged.print = FALSE}
+fm4Soy.nlme <-
+  nlme(weight ~ SSlogis(Time, Asym, xmid, scal),
+    data = Soybean,
+    fixed = list(Asym ~ Year * Variety, xmid ~ Year + Variety, scal ~ Year),
+    random = Asym ~ 1,
+    start = c(17, 0, 0, 0, 0, 0, 52, 0, 0, 0, 7.5, 0, 0),
+    weights = varPower(0.95), control = list(verbose = TRUE)
+  )
+# FIXME: An update doesn't work for the fixed argument when fixed is a list
+## p. 293-4 :
+summary(fm4Soy.nlme)
+```
+
+```{r, fig.asp=1}
+plot(augPred(fm4Soy.nlme)) # Fig 6.14, p. 295
+```
+
+```{r}
+anova(fm3Soy.nlme, fm4Soy.nlme)
+```
+
+```{r}
+plot(fm4Soy.nlme)
+```
+
+## 6.4 Clinical Study of Phenobarbital Kinetics
+
+```{r}
+head(Phenobarb)
+```
+
+```{r, fig.asp=1}
+plot(Phenobarb)
+```
+
+```{r}
+(fm1Pheno.nlme <-
+  nlme(conc ~ phenoModel(Subject, time, dose, lCl, lV),
+    data = Phenobarb,
+    fixed = lCl + lV ~ 1,
+    random = pdDiag(lCl + lV ~ 1), start = c(-5, 0),
+    na.action = NULL, naPattern = ~ !is.na(conc)
+  ))
+```
+
+```{r}
+fm1Pheno.ranef <- ranef(fm1Pheno.nlme, augFrame = TRUE)
+# (These plots used to encounter difficulties, now fine):
+plot(fm1Pheno.ranef, form = lCl ~ Wt + ApgarInd)
+```
+
+```{r}
+plot(fm1Pheno.ranef, form = lV ~ Wt + ApgarInd)
+```
+
+```{r}
+plot(fm1Pheno.nlme, conc ~ fitted(.), abline = c(0, 1))
+```
+
+```{r}
+# if(FALSE)## This fit just "ping-pongs" until max.iterations error
+# fm2Pheno.nlme <-
+#    update(fm1Pheno.nlme,
+#           fixed = list(lCl ~ Wt, lV ~ Wt + ApgarInd),
+#           start = c(-5.0935, 0, 0.34259, 0, 0),
+#           control = list(pnlsTol = 1e-4, maxIter = 500,
+#           msVerbose = TRUE, opt = "nlm"))
+## summary(fm2Pheno.nlme)
+```
+
+```{r}
+## fm3Pheno.nlme <-
+##    update(fm2Pheno.nlme,
+##           fixed = lCl + lV ~ Wt,
+##           start = fixef(fm2Pheno.nlme)[-5])
+## plot(fm3Pheno.nlme, conc ~ fitted(.), abline = c(0,1))
+```

@@ -1,0 +1,48 @@
+---
+title: "Chapter 4"
+output: html_notebook
+---
+
+# 4 효율적인 워크플로우
+
+## 4.1 효율적인 워크플로를 위한 상위 5가지 팁
+
+1.  코드를 작성하지 않고 명확한 마음과 펜과 종이로 시작하십시오. 이렇게 하면 기술에서 길을 잃지 않고 목표를 마음의 최전선에 유지할 수 있습니다.
+
+2.  계획을 세우십시오. 크기와 성격은 프로젝트에 따라 다르지만 일정, 리소스 및 '청크' 작업은 시작할 때 작업을 더 효과적으로 만들 것입니다.
+
+3.  계획을 조기에 구현하는 데 사용할 패키지를 선택하십시오. 사용 가능한 옵션을 조사하고 선택하는 데 몇 분을 투자하면 향후 몇 시간을 절약할 수 있습니다.
+
+4.  모든 단계에서 작업을 문서화하십시오. 작업은 명확하게 전달되어야만 효과적일 수 있고 코드는 주석이 있어야만 효율적으로 이해할 수 있습니다.
+
+5.  전체 워크플로를 가능한 한 재현 가능하게 만드십시오. knitr 는 문서화 단계에서 이것을 도울 수 있습니다.
+
+## 4.4 패키지 선택
+
+```{r}
+deg2rad <- function(deg) deg * pi / 180
+
+o <- c(lon = -1.55, lat = 53.80)
+d <- c(lon = -1.61, lat = 54.98)
+
+o_rad <- deg2rad(o)
+d_rad <- deg2rad(d)
+
+delta_lon <- o_rad[1] - d_rad[1]
+delta_lat <- o_rad[2] - d_rad[2]
+
+a <- sin(delta_lat / 2)^2 + cos(o_rad[2]) * cos(d_rad[2]) * sin(delta_lon / 2)^2
+c <- 2 * asin(min(1, sqrt(a)))
+(d_hav1 <- 6371 * c)
+```
+
+```{r}
+(d_hav2 <- geosphere::distHaversine(o, d))
+```
+
+### 4.4.1 R 패키지 검색
+
+```{r}
+# Search CRAN for mentions of haversine
+RSiteSearch("haversine")
+```

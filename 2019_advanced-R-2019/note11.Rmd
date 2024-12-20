@@ -1,0 +1,196 @@
+---
+title: "note11"
+output: html_notebook
+---
+
+# 11 Function operators
+
+## 11.1 Introduction
+
+```{r}
+chatty <- function(f) {
+  force(f)
+  function(x, ...) {
+    res <- f(x, ...)
+    cat("Processing ", x, "\n", sep = "")
+    res
+  }
+}
+f <- function(x) x^2
+s <- c(3, 2, 1)
+purrr::map_dbl(s, chatty(f))
+```
+
+```{r}
+library(purrr)
+library(memoise)
+```
+
+## 11.2 Existing function operators
+
+```{r}
+x <- list(
+  c(0.512, 0.165, 0.717),
+  c(0.064, 0.781, 0.427),
+  c(0.890, 0.785, 0.495),
+  "oops"
+)
+
+out <- rep(NA_real_, length(x))
+for (i in seq_along(x)) {
+  try(out[[i]] <- sum(x[[i]]))
+}
+out
+```
+
+```{r}
+safe_sum <- safely(sum)
+safe_sum
+```
+
+```{r}
+str(safe_sum(x[[1]]))
+```
+
+```{r}
+str(safe_sum(x[[4]]))
+```
+
+```{r}
+out <- map(x, safely(sum))
+str(out)
+```
+
+```{r}
+out <- transpose(map(x, safely(sum)))
+str(out)
+```
+
+```{r}
+ok <- map_lgl(out$error, is.null)
+ok
+x[!ok]
+```
+
+```{r}
+out$result[ok]
+```
+
+```{r}
+fit_model <- function(df) {
+  glm(mpg ~ disp, data = df)
+}
+
+models <- transpose(map(split(mtcars, mtcars$cyl), safely(fit_model)))
+ok <- map_lgl(models$error, is.null)
+
+# which data failed to converge?
+# datasets[!ok]
+
+# which models were successful?
+models[ok]
+```
+
+```{r}
+slow_function <- function(x) {
+  Sys.sleep(1)
+  x * 10 * runif(1)
+}
+system.time(print(slow_function(1)))
+system.time(print(slow_function(1)))
+```
+
+```{r}
+fib <- function(n) {
+  if (n < 2) {
+    return(1)
+  }
+  fib(n - 2) + fib(n - 1)
+}
+system.time(fib(29))
+system.time(fib(30))
+```
+
+```{r}
+fib2 <- memoise::memoise(function(n) {
+  if (n < 2) {
+    return(1)
+  }
+  fib2(n - 2) + fib2(n - 1)
+})
+system.time(fib2(29))
+system.time(fib2(30))
+system.time(fib2(30))
+system.time(fib2(30))
+```
+
+```{r}
+system.time(fib(24))
+```
+
+## 11.3 Case study: Creating your own function operators
+
+```{r}
+urls <- c(
+  "adv-r" = "https://adv-r.hadley.nz",
+  "r4ds" = "http://r4ds.had.co.nz/"
+  # and many many more
+)
+path <- paste(tempdir(), names(urls), ".html")
+
+walk2(urls, path, download.file, quiet = TRUE)
+```
+
+```{r}
+for (i in seq_along(urls)) {
+  Sys.sleep(0.1)
+  if (i %% 10 == 0) cat(".")
+  download.file(urls[[i]], path[[i]])
+}
+```
+
+```{r}
+delay_by <- function(f, amount) {
+  force(f)
+  force(amount)
+
+  function(...) {
+    Sys.sleep(amount)
+    f(...)
+  }
+}
+system.time(runif(100))
+system.time(delay_by(runif, 0.1)(100))
+```
+
+```{r}
+dot_every <- function(f, n) {
+  force(f)
+  force(n)
+
+  i <- 0
+  function(...) {
+    i <<- i + 1
+    if (i %% n == 0) cat(".")
+    f(...)
+  }
+}
+walk(1:100, runif)
+walk(1:100, dot_every(runif, 10))
+```
+
+```{r}
+walk2(
+  urls, path,
+  dot_every(delay_by(download.file, 0.1), 10),
+  quiet = TRUE
+)
+```
+
+```{r}
+walk2(
+  urls, path,
+  download.file %>% dot_every(10) %>% delay_by(0.1),
+  quiet = TRUE
+)
+```

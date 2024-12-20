@@ -1,0 +1,67 @@
+---
+title: "note22"
+output: html_notebook
+---
+
+# 22 Debugging
+
+## 22.1 Introduction
+
+## 22.2 Overall approach
+
+## 22.3 Locating errors
+
+```{r}
+f <- function(a) g(a)
+g <- function(b) h(b)
+h <- function(c) i(c)
+i <- function(d) {
+  if (!is.numeric(d)) {
+    stop("`d` must be numeric", call. = FALSE)
+  }
+  d + 10
+}
+try(f("a"))
+```
+
+```{r}
+j <- function() k()
+k <- function() stop("Oops!", call. = FALSE)
+try(f(j()))
+```
+
+```{r}
+try(rlang::with_abort(f(j())))
+try(rlang::last_trace())
+```
+
+## 22.4 Interactive debugger
+
+```{r}
+g <- function(b) {
+  # browser()
+  h(b)
+}
+try(f(10))
+```
+
+## 22.5 Non-interactive debugging
+
+```{r}
+f <- function(a) {
+  cat("f()\n")
+  g(a)
+}
+g <- function(b) {
+  cat("g()\n")
+  cat("b =", b, "\n")
+  h(b)
+}
+h <- function(c) {
+  cat("i()\n")
+  i(c)
+}
+f(10)
+```
+
+## 22.6 Non-error failures

@@ -1,0 +1,276 @@
+---
+title: "note03"
+output: html_notebook
+---
+
+# 3 Describing the Structure of Grouped Data
+
+```{r}
+library(nlme)
+```
+
+
+## 3.1 The Display Formula and Its Components
+
+```{r}
+formula(Rail)
+```
+
+```{r}
+formula(ergoStool)
+```
+
+```{r}
+formula(Machines)
+```
+
+```{r}
+formula(Orthodont)
+```
+
+```{r}
+formula(Pixel)
+```
+
+```{r}
+formula(Oats)
+```
+
+```{r}
+table(Oxboys$Subject)
+```
+
+```{r}
+table(getGroups(Oxboys))
+```
+
+```{r}
+unique(table(getCovariate(Oxboys), getGroups(Oxboys)))
+```
+
+```{r}
+length(unique(getCovariate(Oxboys)))
+```
+
+```{r}
+unique(getGroups(Pixel, level = 1))
+```
+
+```{r}
+unique(getGroups(Pixel, level = 2))
+```
+
+```{r}
+Pixel.groups <- getGroups(Pixel, level = 1:2)
+class(Pixel.groups)
+names(Pixel.groups)
+unique(Pixel.groups[["Side"]])
+```
+
+```{r}
+formula(PBG)
+```
+
+```{r}
+PBG.log <- update(PBG, formula = deltaBP ~ log(dose) | Rabbit)
+formula(PBG.log)
+```
+
+```{r}
+unique(getCovariate(PBG.log))
+unique(getCovariate(PBG))
+```
+
+```{r}
+write.table(Oxboys, "data/oxboys.dat")
+
+Oxboys.frm <- read.table("data/oxboys.dat", header = TRUE)
+Oxboys.frm
+```
+
+```{r}
+class(Oxboys.frm)
+dim(Oxboys.frm)
+```
+
+```{r}
+Oxboys2 <- groupedData(height ~ age | Subject,
+  data = Oxboys.frm,
+  labels = list(x = "Centered age", y = "Height"),
+  units = list(y = "(cm)")
+)
+head(Oxboys2)
+```
+
+```{r}
+unique(getGroups(Oxboys))
+```
+
+```{r}
+plot(Oxboys2)
+```
+
+```{r}
+plot(BodyWeight, outer = ~Diet, aspect = 1)
+```
+
+```{r}
+plot(BodyWeight, outer = TRUE, aspect = 1)
+```
+
+```{r}
+plot(Soybean, outer = ~ Year * Variety, aspect = 1)
+```
+
+```{r}
+plot(Soybean, outer = ~ Variety * Year, aspect = 1)
+```
+
+```{r}
+gsummary(BodyWeight, invar = TRUE)
+```
+
+```{r}
+plot(PBG, outer = ~Treatment, scales = list(x = list(log = 2)))
+plot(PBG, inner = ~Treatment, scales = list(x = list(log = 2)))
+```
+
+```{r}
+ergoStool.mat <- asTable(ergoStool)
+ergoStool.mat
+```
+
+```{r}
+ergoStool.new <- balancedGrouped(effort ~ Type | Subject, data = ergoStool.mat)
+ergoStool.new
+```
+
+```{r}
+plot(CO2, layout = c(6, 2), between = list(x = c(0, 0, 0.5, 0, 0)))
+```
+
+```{r}
+plot(Spruce,
+  layout = c(7, 4, 3),
+  skip = c(
+    rep(FALSE, 27), TRUE, rep(FALSE, 27), TRUE,
+    rep(FALSE, 12), rep(TRUE, 2), rep(FALSE, 13)
+  )
+)
+```
+
+```{r}
+plot(Spruce,
+  layout = c(9, 3, 3),
+  skil = c(rep(FALSE, 66), TRUE, TRUE, rep(FALSE, 13))
+)
+```
+
+```{r}
+unique(getCovariate(DNase))
+```
+
+```{r}
+log(unique(getCovariate(DNase)), 2)
+```
+
+```{r}
+plot(DNase, layout = c(6, 2), scales = list(x = list(log = 2)))
+```
+
+```{r}
+plot(Pixel, layout = c(4, 5), between = list(x = c(0, 0.5), y = 0.5), aspect = 0.7)
+```
+
+```{r}
+plot(Pixel, displayLevel = 1)
+```
+
+```{r}
+plot(Wafer, display = 1, collapse = 1)
+```
+
+```{r}
+plot(Wafer, display = 1, collapse = 1, FUN = function(x) sqrt(var(x)), layout = c(10, 1))
+```
+
+```{r}
+sapply(ergoStool, data.class)
+```
+
+```{r}
+gsummary(Theoph, inv = TRUE)
+```
+
+```{r}
+gsummary(Theoph, omit = TRUE, inv = TRUE)
+```
+
+```{r}
+is.null(gsummary(Theoph, inv = T, omit = T))
+is.null(gsummary(Oxboys, inv = T, omit = T))
+```
+
+```{r}
+gsummary(Theoph)
+```
+
+```{r}
+gsummary(Theoph, FUN = max, omit = TRUE)
+```
+
+```{r}
+Quin.sum <- gsummary(Quinidine, omit = TRUE, FUN = mean)
+Quin.sum
+```
+
+```{r}
+dim(Quin.sum)
+```
+
+```{r}
+Quinidine[Quinidine[["Subject"]] == 3, 1:8]
+```
+
+```{r}
+Quin.sum1 <- gsummary(Quinidine, omit = TRUE)
+Quin.sum1[1:10, 1:7]
+```
+
+```{r}
+summary(Quin.sum1)
+```
+
+```{r}
+summary(Quinidine)
+```
+
+```{r}
+sum(!is.na(Quinidine[["conc"]]))
+sum(!is.na(Quinidine[["dose"]]))
+```
+
+```{r}
+gapply(Quinidine, "conc", function(x) sum(!is.na(x)))
+```
+
+```{r}
+table(gapply(Quinidine, "conc", function(x) sum(!is.na(x))))
+```
+
+```{r}
+changeRecords <- gapply(Quinidine, FUN = function(frm) any(is.na(frm[["conc"]]) & is.na(frm[["dose"]])))
+changeRecords
+```
+
+```{r}
+sort(as.numeric(names(changeRecords[changeRecords])))
+```
+
+```{r}
+Quinidine[29:31, ]
+```
+
+```{r}
+Quinidine[Quinidine[["Subject"]] == 4, ]
+```

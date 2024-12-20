@@ -1,0 +1,388 @@
+---
+title: "note17"
+output: html_notebook
+---
+
+# 17 PRT Trial: Modeling Muscle Fiber Specific-Force
+
+## 17.2 A Model with Occasion-Specific Random Intercepts for Type-1 Fibers
+
+```{r}
+library(nlme)
+library(lattice)
+data(prt, package = "nlmeU")
+prt
+```
+
+```{r}
+lme.spec.form1 <-
+  formula(spec.fo ~ (prt.f + occ.f)^2 + sex.f + age.f + sex.f:age.f + bmi)
+prt1 <- subset(prt, fiber.f == "Type 1", select = -fiber.f)
+prt1
+```
+
+```{r, paged.print=FALSE}
+fm17.1 <- lme(lme.spec.form1, random = ~ occ.f - 1 | id, data = prt1)
+summary(fm17.1)
+```
+
+```{r}
+getGroupsFormula(fm17.1)
+```
+
+```{r}
+str(grpF <- getGroups(fm17.1))
+```
+
+```{r}
+nF1 <- xtabs(~grpF)
+range(nF1)
+```
+
+```{r}
+nF1[which.min(nF1)]
+```
+
+```{r}
+str(fm17.1$dims)
+```
+
+```{r}
+fixed1 <- summary(fm17.1)$tTable
+nms <- rownames(fixed1)
+nms[7:8] <- c("fLow:fPos", "fMale:FOld")
+rownames(fixed1) <- nms
+printCoefmat(fixed1, has.Pvalue = TRUE, P.values = TRUE)
+```
+
+```{r}
+getVarCov(fm17.1)
+```
+
+```{r}
+VarCorr(fm17.1)
+```
+
+```{r}
+Ri <- getVarCov(fm17.1, c("5", "275"), type = "conditional")
+Ri$"275"
+```
+
+```{r}
+Ri.5 <- Ri$"5"
+dim(Ri.5)
+```
+
+```{r}
+Ri.5d <- diag(Ri.5)[1:6]
+Ri.5d
+```
+
+```{r}
+sgma <- summary(fm17.1)$sigma
+sgma^2
+```
+
+```{r}
+dt5 <- subset(prt1, select = c(id, occ.f), id == "5")
+auxF1 <- function(elv) {
+  idx <- 1:min(length(elv), 2)
+  elv[idx]
+}
+i.u5 <- unlist(tapply(rownames(dt5), dt5$occ.f, FUN = auxF1))
+i.u5
+```
+
+```{r}
+dt.u5 <- dt5[i.u5, ]
+nms.u5 <- paste(i.u5, dt.u5$occ.f, sep = ".")
+nms.u5
+```
+
+```{r}
+Vi <- getVarCov(fm17.1, "5", type = "marginal")
+Vi.5 <- Vi$"5"
+Vi.u5 <- Vi.5[i.u5, i.u5]
+rownames(Vi.u5) <- nms.u5
+Vi.u5
+```
+
+```{r}
+cov2cor(Vi.u5)
+```
+
+```{r}
+rnf <- ranef(fm17.1)
+vrnf <- var(rnf)
+vrnf
+```
+
+```{r}
+plot(rnf)
+```
+
+```{r, fig.width=3, fig.height=3}
+library(ellipse)
+myPanel <- function(x, y, ...) {
+  panel.grid(h = -1, v = -1)
+  panel.xyplot(x, y)
+  ex1 <- ellipse(getVarCov(fm17.1))
+  panel.xyplot(ex1[, 1], ex1[, 2], type = "l", lty = 1)
+  ex2 <- ellipse(vrnf)
+  panel.xyplot(ex2[, 1], ex2[, 2], type = "l", lty = 2)
+}
+xyplot(rnf[, 2] ~ rnf[, 1],
+  xlab = "Pre-intervention",
+  ylab = "Post-intervention",
+  xlim = c(-40, 40), ylim = c(-40, 40),
+  panel = myPanel
+)
+```
+
+```{r}
+prt1r <- within(prt1, {
+  residP1 <- residuals(fm17.1, type = "p")
+  fitted1 <- fitted(fm17.1)
+})
+range(prt1r$residP1)
+```
+
+```{r}
+xyplot(residP1 ~ fitted1 | occ.f,
+  data = prt1r,
+  ylim = c(-6, 6),
+  type = c("p", "smooth"),
+  grid = TRUE
+)
+```
+
+```{r}
+qqnorm(prt1r$residP1)
+qqline(prt1r$residP1)
+```
+
+## 17.3 A Mean-Variance Model with Occasion-Specific Random Intercepts for Type-1 Fibers
+
+```{r}
+fm17.2 <- update(fm17.1,
+  weights = varPower(form = ~ fitted(.)),
+  data = prt1
+)
+fm17.2
+```
+
+```{r}
+intervals(fm17.2)$varStruct
+```
+
+```{r}
+anova(fm17.1, fm17.2)
+```
+
+```{r}
+prt2r <- within(prt1, {
+  residP2 <- residuals(fm17.2, type = "n")
+  fitted2 <- fitted(fm17.2)
+})
+```
+
+```{r}
+xyplot(residP2 ~ fitted2 | occ.f,
+  data = prt2r,
+  ylim = c(-6, 6),
+  type = c("p", "smooth"),
+  grid = TRUE
+)
+```
+
+```{r}
+qqnorm(prt2r$residP2)
+qqline(prt2r$residP2)
+```
+
+## 17.4 Heteroscedastic Fiber-Type×Occasion-Specific Random Intercepts
+
+```{r}
+lme.spec.form3 <-
+  update(
+    lme.spec.form1,
+    . ~ . + fiber.f + prt.f:fiber.f + occ.f:fiber.f
+  )
+fm17.3 <-
+  lme(lme.spec.form3,
+    random = ~ occ.f:fiber.f - 1 | id,
+    data = prt
+  )
+fm17.3
+```
+
+```{r}
+fixed.D4 <- summary(fm17.3)$tTable
+rnms <- rownames(fixed.D4)
+rnms[8:11] <- c("Low:Pos", "Low:Type2", "Pos:Type2", "Male:Old")
+rownames(fixed.D4) <- rnms
+printCoefmat(fixed.D4, digitis = 3, zap.ind = 5)
+```
+
+```{r}
+fm17.3cov <- getVarCov(fm17.3, type = "random.effect")
+rownames(fm17.3cov)
+```
+
+```{r}
+nms. <- c("T1.Pre", "T1.Pos", "T2.Pre", "T2.Pos")
+dimnames(fm17.3cov) <- list(nms., nms.)
+fm17.3cov
+```
+
+```{r}
+fm17.3cor <- cov2cor(fm17.3cov)
+print(fm17.3cor, digits = 2, corr = TRUE, stdevs = FALSE)
+```
+
+```{r}
+R.5 <- getVarCov(fm17.3, type = "conditional")[["5"]]
+dim(R.5)
+diag(R.5)[1:6]
+```
+
+```{r}
+sgma <- fm17.3$sigma
+sgma
+print(sgma^2)
+```
+
+```{r}
+CI <- intervals(fm17.3, which = "var-cov")
+interv <- CI$reStruct$id
+interv
+```
+
+```{r}
+thDnms <-
+  c(
+    "sd(T1Pre)", "sd(T1Pos)", "sd(T2Pre)", "sd(T2Pos)",
+    "cor(T1Pre,T1Pos)", "cor(T1Pre,T2Pre)", "cor(T1Pre,T2Pos)",
+    "cor(T1Pos,T2Pre)", "cor(T1Pos,T2Pos)",
+    "cor(T2Pre,T2Pos)"
+  )
+rownames(interv) <- thDnms
+interv
+```
+
+```{r, fig.width=5, fig.height=5}
+residP3 <- residuals(fm17.3, type = "p")
+xyplot(residP3 ~ fitted(fm17.3) | fiber.f:occ.f,
+  data = prt,
+  type = c("p", "smooth")
+)
+```
+
+```{r}
+qqnorm(residP3)
+qqline(residP3)
+```
+
+```{r}
+Vx <- getVarCov(fm17.3, type = "marginal", individual = "5")
+Vmtx.5 <- Vx$"5"
+dim(Vmtx.5)
+```
+
+```{r}
+dt5 <- subset(prt, select = c(id, fiber.f, occ.f), id == "5")
+dt5
+```
+
+```{r}
+i.u5 <- unlist(tapply(rownames(dt5), list(dt5$fiber.f, dt5$occ.f), FUN = auxF1))
+i.u5
+```
+
+```{r}
+dt.u5 <- dt5[i.u5, ]
+nms.u5 <- paste(format(i.u5, 2, justify = "right"), abbreviate(dt.u5$fiber.f, 2),
+  dt.u5$occ.f,
+  sep = "."
+)
+nms.u5
+```
+
+```{r}
+Vmtx.u5 <- Vmtx.5[i.u5, i.u5]
+dimnames(Vmtx.u5) <- list(nms.u5, i.u5)
+Cmtx.u5 <- cov2cor(Vmtx.u5)
+uptri <- upper.tri(Cmtx.u5)
+Vmtx.u5[uptri] <- Cmtx.u5[uptri]
+print(Vmtx.u5, digits = 2)
+```
+
+## 17.5 Alternate Form of Heteroscedastic Fiber-Type×Occasion Random Intercepts
+
+```{r}
+fm17.3a <-
+  lme(lme.spec.form3,
+    random = ~ 1 + fiber.f + occ.f + fiber.f:occ.f | id,
+    data = prt
+  )
+fm17.3a
+```
+
+```{r}
+print(fm17.3a$sigma, digits = 4)
+```
+
+```{r}
+fm17.3acov <- getVarCov(fm17.3a, type = "random.effect", individual = "5")
+dimnames(fm17.3acov)[[1]]
+```
+
+```{r}
+nms <- c("(Int)", "T2", "Pos", "T2:Pos")
+dimnames(fm17.3acov) <- list(nms, nms)
+print(fm17.3acov, digits = 4)
+```
+
+```{r}
+td <- matrix(c(
+  1, 0, 0, 0,
+  1, 0, 1, 0,
+  1, 1, 0, 0,
+  1, 1, 1, 1
+), nrow = 4, ncol = 4, byrow = TRUE)
+mat.D4 <- td %*% fm17.3acov %*% t(td)
+dimnames(mat.D4) <- list(nms., nms.)
+print(mat.D4, digits = 5)
+```
+
+## 17.6 A Model with Heteroscedastic Fiber-Type×Occasion-Specific Random Intercepts and a Structured Matrix D
+
+pdKronecker를 다운받아서 해보았지만, 작동 불가로 더이상 진행하지 않음.
+
+```{r}
+# install.packages("nlmeUpdK", repos="http://R-Forge.R-project.org")
+library(nlmeUpdK)
+```
+
+```{r}
+pdId <- pdIdent(~1)
+pd1UN <- pdLogChol(~ fiber.f - 1)
+pd2UN <- pdLogChol(~ occ.f - 1)
+pdL1 <-
+  list(
+    X = pdId,
+    FiberType = pd1UN,
+    PrePos = pd2UN
+  )
+
+pdKnms <- names(pdL1)
+pdKnms
+```
+
+```{r}
+try(fm17.4 <-
+  lme(lme.spec.form3,
+    random = list(id = pdKronecker(pdL1)),
+    data = prt
+  ))
+```

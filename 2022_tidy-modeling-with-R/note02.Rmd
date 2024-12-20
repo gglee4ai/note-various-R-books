@@ -1,0 +1,124 @@
+---
+title: "note02"
+output: html_notebook
+---
+
+# 2 A Tidyverse 입문서
+
+## 2.1 타이디버스 원칙
+
+```{r}
+mtcars[order(mtcars$gear, mtcars$mpg), ]
+```
+
+```{r}
+library(dplyr)
+arrange(mtcars, gear, mpg)
+```
+
+```{r}
+boot_samp <- rsample::bootstraps(mtcars, times = 3)
+boot_samp
+```
+
+```{r}
+small_mtcars <- arrange(mtcars, gear)
+small_mtcars <- slice(small_mtcars, 1:10)
+small_mtcars
+```
+
+```{r}
+small_mtcars <-
+  mtcars %>%
+  arrange(gear) %>%
+  slice(1:10)
+```
+
+```{r}
+library(ggplot2)
+ggplot(mtcars, aes(x = wt, y = mpg)) +
+  geom_point() +
+  geom_smooth(method = lm)
+```
+
+```{r}
+n <- nrow(mtcars)
+ratios <- rep(NA_real_, n)
+for (car in 1:n) {
+  ratios[car] <- log(mtcars$mpg[car] / mtcars$wt[car])
+}
+head(ratios)
+```
+
+```{r}
+ratios <- log(mtcars$mpg / mtcars$wt)
+ratios
+```
+
+```{r}
+compute_log_ratio <- function(mpg, wt, log_base = exp(1)) {
+  log(mpg / wt, base = log_base)
+}
+```
+
+```{r}
+map(head(mtcars$mpg, 3), sqrt)
+```
+
+```{r}
+map_dbl(head(mtcars$mpg, 3), sqrt)
+```
+
+```{r}
+log_ratios <- map2_dbl(mtcars$mpg, mtcars$wt, compute_log_ratio)
+head(log_ratios)
+```
+
+```{r}
+map2_dbl(mtcars$mpg, mtcars$wt, ~ log(.x / .y)) %>%
+  head()
+```
+
+## 2.2 TIDYVERSE 구문의 예
+
+```{r}
+data.frame(`variable 1` = 1:2, two = 3:4)
+```
+
+```{r}
+df <- data.frame(`variable 1` = 1:2, two = 3:4, check.names = FALSE)
+df
+```
+
+```{r}
+tbbl <- tibble(`variable 1` = 1:2, two = 3:4)
+tbbl
+```
+
+```{r}
+df[, "two"]
+```
+
+```{r}
+tbbl[, "two"]
+```
+
+```{r}
+library(tidyverse)
+library(lubridate)
+
+url <- "https://data.cityofchicago.org/api/views/5neh-572f/rows.csv?accessType=DOWNLOAD&bom=true&format=true"
+
+all_stations <-
+  # Step 1: Read in the data.
+  read_csv(url) %>%
+  # Step 2: filter columns and rename stationname
+  dplyr::select(station = stationname, date, rides) %>%
+  # Step 3: Convert the character date field to a date encoding.
+  # Also, put the data in units of 1K rides
+  mutate(date = mdy(date), rides = rides / 1000) %>%
+  # Step 4: Summarize the multiple records using the maximum.
+  group_by(date, station) %>%
+  summarize(rides = max(rides), .groups = "drop")
+all_stations
+```

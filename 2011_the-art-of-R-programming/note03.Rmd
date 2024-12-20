@@ -1,0 +1,306 @@
+---
+title: "note03"
+output: html_notebook
+---
+
+```{r}
+y <- matrix(1:4, nrow = 2)
+y
+```
+
+```{r}
+y[, 2]
+```
+
+```{r}
+y <- matrix(nrow = 2, ncol = 2)
+y[1, 1] <- 1
+y[2, 1] <- 2
+y[1, 2] <- 3
+y[2, 2] <- 4
+y
+```
+
+```{r}
+m <- matrix(1:6, nrow = 2, byrow = TRUE)
+m
+```
+
+```{r}
+y %*% y
+```
+
+```{r}
+3 * y
+```
+
+```{r}
+y + y
+```
+
+```{r}
+z <- matrix(c(1:4, 1, 1, 0, 0, 1, 0, 1, 0), ncol = 3)
+z
+```
+
+```{r}
+z[, 2:3]
+```
+
+```{r}
+z[2:3, ]
+```
+
+```{r}
+y <- matrix(1:6, nrow = 3)
+y[c(1, 3), ] <- matrix(c(1, 1, 8, 12), nrow = 2)
+y
+```
+
+```{r}
+x <- matrix(nrow = 3, ncol = 3)
+x
+y <- matrix(c(4, 5, 2, 3), nrow = 2)
+y
+x[2:3, 2:3] <- y
+x
+```
+
+```{r}
+y[-2, ]
+```
+
+```{r}
+# install.packages("pixmap")
+library(pixmap)
+```
+
+```{r}
+x <- matrix(c(1, 2, 3, 2, 3, 4), nrow = 3)
+x
+x[x[, 2] >= 3, ]
+```
+
+```{r}
+z <- c(5, 12, 13)
+x[z %% 2 == 1, ]
+```
+
+```{r}
+m <- matrix(1:6, nrow = 3)
+m
+filtered <- m[, 1] > 1 & m[, 2] > 5
+m[filtered, ]
+```
+
+```{r}
+which(m > 3)
+```
+
+```{r}
+makecov <- function(rho, n) {
+  m < -matrix(nrow = n, ncol = n)
+  m <- ifelse(row(m) == col(m), 1, rho)
+  m
+}
+```
+
+```{r}
+z <- matrix(1:6, nrow = 3)
+z
+```
+
+```{r}
+f <- function(x) x / c(2, 8)
+t(apply(z, 1, f))
+```
+
+```{r}
+apply(z, 1, sum)
+apply(z, 2, sum)
+```
+
+```{r}
+findols <- function(x) {
+  findol <- function(xrow) {
+    mdn <- median(xrow)
+    devs <- abs(xrow - mdn)
+    return(which.max(devs))
+  }
+  return(apply(x, 1, findol))
+}
+```
+
+```{r}
+
+```
+
+```{r}
+x <- matrix(rpois(100, 5), nrow = 10)
+x
+```
+
+```{r}
+findols(x)
+```
+
+```{r}
+x <- c(12, 5, 13, 16, 8)
+x <- c(x, 20)
+x
+```
+
+```{r}
+x <- c(x[1:3], 20, x[4:6])
+x
+x <- x[-2:-4]
+x
+```
+
+```{r}
+one <- rep(1, 4)
+one
+z <- matrix(c(1, 2, 3, 4, 1, 1, 0, 0, 1, 0, 1, 0), nrow = 4)
+z
+```
+
+```{r}
+cbind(one, z)
+```
+
+```{r}
+q <- cbind(c(1, 2), c(3, 4))
+q
+cbind(one, q)
+```
+
+```{r}
+q <- matrix(c(
+  0, 12, 13, 8, 20, 12, 0, 15, 28, 88, 13, 15, 0, 6, 9, 8,
+  28, 6, 0, 33, 20, 88, 9, 33, 0
+), nrow = 5)
+q
+```
+
+```{r}
+mind <- function(d) {
+  d <- q
+  n <- nrow(d)
+  dd <- cbind(d, 1:n)
+  wmins <- apply(dd[-n, ], 1, imin)
+  i <- which.min(wmins[2, ])
+  j <- wmins[1, i]
+  return(c(d[i, j], i, j))
+}
+```
+
+```{r}
+imin <- function(x) {
+  lx <- length(x)
+  i <- x[lx]
+  j <- which.min(x[(i + 1):(lx - 1)])
+  k <- i + j
+  return(c(k, x[k]))
+}
+```
+
+```{r}
+mind(q)
+```
+
+```{r}
+minda <- function(d) {
+  smallest <- min(d)
+  ij <- which(d == smallest, arr.ind = TRUE)
+  return(c(smallest, ij))
+}
+```
+
+```{r}
+minda(q)
+```
+
+```{r}
+which(q == 0, arr.ind = TRUE)
+```
+
+```{r}
+q
+q[!upper.tri(q)] <- max(q)
+q
+smallest <- min(q, na.rm = TRUE)
+(which(q == smallest, arr.ind = TRUE))
+```
+
+```{r}
+z <- matrix(1:8, nrow = 4)
+z
+```
+
+```{r}
+length(z)
+```
+
+```{r}
+class(z)
+```
+
+```{r}
+attributes(z)
+```
+
+```{r}
+dim(z)
+nrow(z)
+ncol(z)
+```
+
+```{r}
+z
+```
+
+```{r}
+r <- z[2, , drop = FALSE]
+r
+```
+
+```{r}
+dim(r)
+```
+
+```{r}
+u <- 1:3
+attributes(u)
+```
+
+```{r}
+v <- as.matrix(u)
+attributes(v)
+class(v)
+```
+
+```{r}
+z <- matrix(1:4, nrow = 2)
+colnames(z) <- c("a", "b")
+rownames(z) <- c("1st", "2nd")
+z
+```
+
+```{r}
+firsttest <- matrix(c(46, 21, 50, 30, 25, 50), nrow = 3)
+firsttest
+```
+
+```{r}
+secondtest <- matrix(c(46, 41, 50, 43, 35, 50), nrow = 3)
+secondtest
+```
+
+```{r}
+tests <- array(data = c(firsttest, secondtest), dim = c(3, 2, 2))
+tests
+```
+
+```{r}
+attributes(tests)
+```

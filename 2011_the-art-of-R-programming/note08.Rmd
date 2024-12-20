@@ -1,0 +1,263 @@
+---
+title: "note08"
+output: html_notebook
+---
+
+```{r}
+x <- c(1, 1, 2, 2, 3, 3)
+which.max(x)
+which.min(x)
+```
+
+```{r}
+pmin(x, 2)
+```
+
+```{r}
+exactlyone <- function(p) {
+  notp <- 1 - p
+  tot <- 0.0
+  for (i in 1:length(p)) {
+    tot <- tot + p[i] * prod(not[-1])
+  }
+  return(tot)
+}
+```
+
+```{r}
+x <- c(12, 5, 13)
+cumsum(x)
+cumprod(x)
+```
+
+```{r}
+z <- matrix(c(1, 5, 6, 2, 3, 2), nrow = 3)
+z
+```
+
+```{r}
+min(z[, 2])
+```
+
+```{r}
+pmin(z[, 1], z[, 2])
+```
+
+```{r}
+pmin(z[1, ], z[2, ], z[3, ])
+```
+
+```{r}
+nlm(function(x) x^2 - sin(x), 8)
+```
+
+```{r}
+f <- function(x) x^2 - sin(x)
+curve(f, from = -10, to = 10)
+```
+
+```{r}
+D(expression(exp(x^2)), "x")
+```
+
+```{r}
+integrate(function(x) x^2, 0, 1)
+```
+
+```{r}
+mean(rchisq(1000, df = 2))
+```
+
+```{r}
+qchisq(0.95, 2)
+```
+
+```{r}
+qchisq(c(0.5, 0.95), df = 2)
+```
+
+```{r}
+x <- c(13, 5, 12, 5)
+sort(x)
+```
+
+```{r}
+order(x)
+```
+
+```{r}
+y <- data.frame(V1 = c("def", "ab", "zzzz"), V2 = c(2, 5, 1))
+r <- order(y$V2)
+y[r, ]
+```
+
+```{r}
+y[order(y$V1), ]
+```
+
+```{r}
+x <- c(13, 5, 12, 5)
+rank(x)
+```
+
+```{r}
+y <- c(1, 3, 4, 10)
+2 * y
+```
+
+```{r}
+crossprod(1:3, c(5, 12, 13))
+```
+
+```{r}
+a <- matrix(c(1, 3, 2, 4), nrow = 2)
+b <- matrix(c(1, 0, -1, 1), nrow = 2)
+a
+b
+```
+
+```{r}
+a %*% b
+```
+
+```{r}
+a <- matrix(c(1, 1, -1, 1), nrow = 2)
+b <- c(2, 4)
+solve(a, b)
+solve(a)
+```
+
+```{r}
+m <- matrix(c(1, 7, 2, 8), nrow = 2)
+m
+dm <- diag(m)
+dm
+```
+
+```{r}
+diag(dm)
+```
+
+```{r}
+diag(3)
+```
+
+```{r}
+m <- matrix(1:9, nrow = 3, byrow = TRUE)
+m
+sweep(m, 1, c(1, 4, 7), "+")
+sweep(m, 2, c(1, 4, 7), "+")
+```
+
+```{r}
+xprod <- function(x, y) {
+  m <- rbind(rep(NA, 3), x, y)
+  xp <- vector(length = 3)
+  for (i in 1:3) {
+    xp[i] <- -(-1)^i * det(m[2:3, -i])
+  }
+  return(xp)
+}
+```
+
+```{r}
+x <- c(1, 2, 5)
+y <- c(5, 1, 8, 9)
+union(x, y)
+intersect(x, y)
+setdiff(x, y)
+setdiff(y, x)
+setequal(x, y)
+setequal(x, c(5, 2, 1))
+2 %in% x
+2 %in% y
+choose(5, 2)
+```
+
+```{r}
+symdiff <- function(x, y) {
+  sdfxy <- setdiff(x, y)
+  sdfyx <- setdiff(y, x)
+  union(sdfxy, sdfyx)
+}
+```
+
+```{r}
+symdiff(c(1, 2, 5), c(5, 1, 8, 9))
+```
+
+```{r}
+`%subsetof%` <- function(u, v) {
+  return(setequal(intersect(u, v), u))
+}
+c(3, 8) %subsetof% 1:10
+c(3, 8) %subsetof% 5:10
+```
+
+```{r}
+combn(1:3, 2)
+```
+
+```{r}
+combn(1:3, 2, sum)
+```
+
+```{r}
+x <- rbinom(100000, 5, 0.5)
+mean(x >= 4)
+```
+
+```{r}
+emax1 <- function(nreps) {
+  sum <- 0
+  for (i in 1:nreps) {
+    xy <- rnorm(2)
+    sum <- sum + max(xy)
+  }
+  sum / nreps
+}
+```
+
+```{r}
+emax <- function(nreps) {
+  x <- rnorm(2 * nreps)
+  maxxy <- pmax(x[1:nreps], x[(nreps + 1):(2 * nreps)])
+  return(mean(maxxy))
+}
+```
+
+```{r}
+nreps <- 100000
+bench::mark(emax1(nreps), emax(nreps), check = FALSE)
+```
+
+```{r}
+nreps <- 1
+sim <- function(nreps) {
+  commdata <- list()
+  commdata$countabsamecom <- 0
+  for (rep in 1:nreps) {
+    commdata$whosleft <- 1:20
+    commdata$numabchosen <- 0
+    commdata <- choosecom(commdata, 5)
+    if (commdata$numabchosen > 0) next
+    commdata <- choosecom(commdata, 4)
+    if (commdata$numabchosen > 0) next
+    commdata <- choosecom(commdata, 3)
+    if (commdata$numabchosen > 0) next
+  }
+  print(commdata$countabsamecomm / nreps)
+}
+
+choosecom <- function(comdat, comsize) {
+  committee <- sample(comdat$whosleft, comsize)
+  comdat$numabchosen <- length(intersect(1:2, committee))
+  if (comdat$numabchosen == 2) {
+    comdat$countabsamecomm <- comdat$countabsamecomm + 1
+  }
+  comdat$whosleft <- setdiff(comdat$whosleft, committee)
+  comdat
+}
+
+sim(10000)
+```

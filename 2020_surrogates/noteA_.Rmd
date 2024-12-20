@@ -1,0 +1,61 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+borehole <- function(x)
+ {
+  rw <- x[1]*(0.15 - 0.05) + 0.05
+  r <-  x[2]*(50000 - 100) + 100
+  Tu <- x[3]*(115600 - 63070) + 63070
+  Hu <- x[4]*(1110 - 990) + 990
+  Tl <- x[5]*(116 - 63.1) + 63.1
+  Hl <- x[6]*(820 - 700) + 700
+  L <-  x[7]*(1680 - 1120) + 1120
+  Kw <- x[8]*(12045 - 9855) + 9855
+  m1 <- 2*pi*Tu*(Hu - Hl)
+  m2 <- log(r/rw)
+  m3 <- 1 + 2*L*Tu / (m2*rw^2*Kw) + Tu/Tl
+  return(m1/m2/m3)
+ }
+```
+
+```{r}
+#install.packages("laGP")
+library(lhs)
+library(laGP)
+```
+
+```{r}
+Npred <- N <- 1000
+x <- randomLHS(N + Npred, 8)
+y <- apply(x, 1, borehole)
+y <- y + rnorm(length(y), sd=1)
+X <- x[1:N,]
+Y <- y[1:N]
+XX <- x[-(1:N),]
+YY <- y[-(1:N)]
+
+ga <- garg(list(mle=TRUE), Y)
+da <- darg(list(mle=TRUE, max=100), X)
+
+tic <- proc.time()[3]
+
+## GP initialization and MAP calculation
+gpsepi <- newGPsep(X, Y, da$start, g=ga$start, dK=TRUE)
+that <- mleGPsep(gpsepi, param="both", tmin=c(da$min, ga$min), 
+  tmax=c(da$max, ga$max), ab=c(da$ab, ga$ab), maxit=1000)
+
+## predict out of sample
+p <- predGPsep(gpsepi, XX, lite=TRUE)
+deleteGPsep(gpsepi)
+
+## timing end 
+toc <- proc.time()[3]
+toc - tic
+
+## N <- 1000: 2.381s
+## N <- 5000: 121s
+## N <- 10000: 434s
+```

@@ -1,0 +1,119 @@
+---
+title: "note20"
+output: html_notebook
+---
+
+```{r}
+options(paged.print = FALSE)
+```
+
+# 20 모델의 앙상블
+
+## 20.1 스태킹을 위한 훈련 세트 생성
+
+```{r}
+load("RData/concrete_results.RData")
+```
+
+```{r}
+library(tidymodels)
+library(rules)
+library(baguette)
+library(stacks)
+library(patchwork)
+library(kableExtra)
+```
+
+```{r}
+stacks() %>%
+  add_candidates(grid_results) %>%
+  as_tibble() %>%
+  mutate(
+    sample_num = row_number(),
+    buffer_1 = "",
+    buffer_2 = ""
+  ) %>%
+  slice_head(n = 6) %>%
+  select(
+    sample_num, CART_bagged_1_1, starts_with("MARS"), Cubist_1_01,
+    buffer_1, Cubist_1_18, buffer_2
+  ) %>%
+  knitr::kable(
+    digits = 2,
+    align = rep("c", 8),
+    col.names = c(
+      "Sample #", "Bagged Tree", "MARS 1", "MARS 2", "Cubist 1",
+      "...", "Cubist 25", "..."
+    ),
+    caption = "Predictions from candidate tuning parameter configurations.",
+    label = "ensemble-candidate-preds"
+  ) %>%
+  kable_styling("striped", full_width = TRUE) %>%
+  add_header_above(c(" ", "Ensemble Candidate Predictions" = 7)) %>%
+  row_spec(0, align = "c")
+```
+
+```{r}
+race_results
+```
+
+```{r}
+library(tidymodels)
+library(stacks)
+tidymodels_prefer()
+
+concrete_stack <-
+  stacks() %>%
+  add_candidates(race_results)
+
+concrete_stack
+```
+
+## 20.2 예측 혼합
+
+```{r}
+set.seed(2001)
+ens <- blend_predictions(concrete_stack)
+```
+
+```{r}
+autoplot(ens)
+```
+
+```{r}
+set.seed(2002)
+ens <- blend_predictions(concrete_stack, penalty = 10^seq(-2, -0.5, length = 20))
+```
+
+```{r}
+autoplot(ens)
+```
+
+```{r}
+ens
+```
+
+```{r}
+autoplot(ens, "weights") +
+  geom_text(aes(x = weight + 0.01, label = model), hjust = 0) +
+  theme(legend.position = "none") +
+  lims(x = c(-0.01, 0.8))
+```
+
+## 20.3 멤버 모델 맞추기
+
+```{r}
+ens <- fit_members(ens)
+```
+
+## 20.4 테스트 세트 결과
+
+```{r}
+reg_metrics <- metric_set(rmse, rsq)
+ens_test_pred <-
+  predict(ens, concrete_test) %>%
+  bind_cols(concrete_test)
+
+ens_test_pred %>%
+  reg_metrics(compressive_strength, .pred)
+```

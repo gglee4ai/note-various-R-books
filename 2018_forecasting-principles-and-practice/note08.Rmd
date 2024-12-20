@@ -1,0 +1,352 @@
+---
+title: "note08"
+output: html_notebook
+---
+
+```{r}
+library(fpp2)
+library(ggplot2)
+theme_set(theme_gray(base_family = "NanumGothic"))
+```
+
+# 8 ARIMA 모델
+
+## 8.1 정상성과 차분
+
+```{r}
+goog200 |>
+  autoplot()
+```
+
+```{r}
+diff(goog200) |>
+  autoplot()
+```
+
+```{r}
+Box.test(diff(goog200), lag = 10, type = "Ljung-Box")
+```
+
+```{r}
+cbind(
+  "판매량 (백만 달러)" = a10,
+  "월별 로그 판매량" = log(a10),
+  "로그 눈금에서 연간 변동" = diff(log(a10), 12)
+) |>
+  autoplot(facets = TRUE) +
+  xlab("연도") +
+  ylab("") +
+  ggtitle("당뇨병 약 판매량")
+```
+
+```{r}
+cbind(
+  "10억 kWh" = usmelec,
+  "로그" = log(usmelec),
+  "계절성 차분 로그값" = diff(log(usmelec), 12),
+  "두 번 차분을 구한 로그값" = diff(diff(log(usmelec), 12), 1)
+) |>
+  autoplot(facets = TRUE)
+```
+
+```{r}
+library(urca)
+```
+
+```{r}
+goog |>
+  ur.kpss() |>
+  summary()
+```
+
+```{r}
+goog |>
+  diff() |>
+  ur.kpss() |>
+  summary()
+```
+
+```{r}
+ndiffs(goog)
+```
+
+```{r}
+usmelec |>
+  log() |>
+  nsdiffs()
+```
+
+```{r}
+usmelec |>
+  log() |>
+  diff(lag = 12) |>
+  ndiffs()
+```
+
+## 8.2 후방이동 기호
+
+## 8.3 자기회귀 모델
+
+## 8.4 이동 평균 모델
+
+## 8.5 비-계절성 ARIMA 모델
+
+```{r}
+autoplot(uschange[, "Consumption"]) +
+  xlab("연도") +
+  ylab("분기별 백분율 변화")
+```
+
+```{r}
+fit <- auto.arima(uschange[, "Consumption"], seasonal = FALSE)
+fit
+```
+
+```{r}
+coef(fit)
+```
+
+```{r}
+fit |>
+  forecast(h = 10) |>
+  autoplot(include = 80) +
+  ylab("소비")
+```
+
+```{r}
+ggAcf(uschange[, "Consumption"])
+```
+
+```{r}
+ggPacf(uschange[, "Consumption"])
+```
+
+```{r}
+fit2 <- Arima(uschange[, "Consumption"], order = c(3, 0, 0))
+fit2
+```
+
+```{r}
+fit3 <- auto.arima(uschange[, "Consumption"],
+  seasonal = FALSE,
+  stepwise = FALSE,
+  approximation = FALSE
+)
+fit3
+```
+
+## 8.6 추정과 차수 선택
+
+## 8.7 R에서 ARIMA 모델링
+
+```{r}
+elecequip |>
+  stl(s.window = "periodic") |>
+  seasadj() ->
+eeadj
+autoplot(eeadj)
+```
+
+```{r}
+eeadj |>
+  diff() |>
+  ggtsdisplay()
+```
+
+```{r}
+fit <- Arima(eeadj, order = c(3, 1, 1))
+fit
+```
+
+```{r}
+checkresiduals(fit)
+```
+
+```{r}
+autoplot(forecast(fit))
+```
+
+```{r}
+auto.arima(eeadj)
+```
+
+```{r}
+auto.arima(eeadj, approximation = FALSE)
+```
+
+```{r}
+autoplot(fit)
+```
+
+## 8.8 예측하기
+
+## 8.9 계절성 ARIMA 모델들
+
+```{r}
+euretail |>
+  autoplot() +
+  xlab("연도") +
+  ylab("소매 지수")
+```
+
+```{r}
+euretail |>
+  diff(lag = 4) |>
+  ggtsdisplay()
+```
+
+```{r}
+euretail |>
+  diff(lag = 4) |>
+  diff() |>
+  ggtsdisplay()
+```
+
+```{r}
+euretail |>
+  Arima(order = c(0, 1, 1), seasonal = c(0, 1, 1)) |>
+  residuals() |>
+  ggtsdisplay()
+```
+
+```{r}
+fit3 <- Arima(euretail, order = c(0, 1, 3), seasonal = c(0, 1, 1))
+checkresiduals(fit3)
+```
+
+```{r}
+fit3 |>
+  forecast(h = 12) |>
+  autoplot()
+```
+
+```{r}
+auto.arima(euretail, approximation = FALSE)
+```
+
+```{r}
+autoplot(h02)
+```
+
+```{r}
+lh02 <- log(h02)
+cbind(
+  "H02 판매량 (백만 처방전)" = h02,
+  "로그 H02 판매량" = lh02
+) |>
+  autoplot(facets = TRUE) +
+  xlab("연도") +
+  ylab("")
+```
+
+```{r}
+lh02 |>
+  diff(lag = 12) |>
+  ggtsdisplay(xlab = "연도", main = "계절성 차분을 구한 H02 처방전 데이터")
+```
+
+```{r}
+fit <- Arima(h02, order = c(3, 0, 1), seasonal = c(0, 1, 2), lambda = 0)
+fit
+```
+
+```{r}
+checkresiduals(fit, lag = 36)
+```
+
+```{r}
+auto.arima(lh02)
+auto.arima(lh02, approximation = FALSE)
+```
+
+```{r}
+h02 |>
+  Arima(order = c(3, 0, 1), seasonal = c(0, 1, 2), lambda = 0) |>
+  forecast() |>
+  autoplot() +
+  ylab("H02 판매량 (백만 처방전)") + xlab("연도") +
+  ggtitle("ARIMA(3,0,1)(0,1,2)로 얻은 예측값")
+```
+
+## 8.10 ARIMA vs ETS
+
+```{r}
+fets <- function(x, h) {
+  forecast(ets(x), h = h)
+}
+
+farima <- function(x, h) {
+  forecast(auto.arima(x), h = h)
+}
+```
+
+```{r}
+air <- window(ausair, start=1990)
+e1 <- tsCV(air, fets, h = 1)
+e2 <- tsCV(air, farima, h = 1)
+```
+
+```{r}
+mean(e1^2, na.rm = TRUE)
+mean(e2^2, na.rm = TRUE)
+```
+
+```{r}
+air |>
+  ets() |>
+  forecast() |>
+  autoplot()
+
+air |>
+  auto.arima() |>
+  forecast() |>
+  autoplot()
+```
+
+```{r}
+cement <- window(qcement, start = 1988)
+cement |>
+  autoplot()
+```
+
+```{r}
+train <- window(cement, end = c(2007, 4))
+fit.arima <- auto.arima(train)
+fit.arima
+```
+
+```{r}
+checkresiduals(fit.arima)
+```
+
+```{r}
+fit.ets <- ets(train)
+fit.ets
+```
+
+```{r}
+checkresiduals(fit.ets)
+```
+
+```{r}
+a1 <- fit.arima |>
+  forecast(h = 4 * (2013 - 2007) + 1) |>
+  accuracy(qcement)
+a1[, c("RMSE", "MAE", "MAPE", "MASE")]
+```
+
+```{r}
+a2 <- fit.ets |>
+  forecast(h = 4 * (2013 - 2007) + 1) |>
+  accuracy(qcement)
+a2[, c("RMSE", "MAE", "MAPE", "MASE")]
+```
+
+```{r}
+cement |>
+  ets() |>
+  forecast(h = 12) |>
+  autoplot()
+```
+
+## 8.11 연습문제

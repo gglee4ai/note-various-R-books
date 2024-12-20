@@ -1,0 +1,75 @@
+---
+title: "Distill for R Markdown"
+author:
+  - name: "JJ Allaire"
+    url: https://github.com/jjallaire
+    affiliation: RStudio
+    affiliation_url: https://www.rstudio.com
+output: distill::distill_article
+---
+
+# introduction
+
+See Figure \@ref(fig:cars-plot).
+
+```{r cars-plot, fig.cap="The cars data.", echo=FALSE}
+#par(mar = c(4, 4, .2, .1))
+plot(cars)  # a scatterplot
+```
+
+
+## fig example 
+
+
+See Figure \@ref(fig:cars-plot2).
+
+## fig example 
+
+```{r cars-plot2, fig.cap="The cars data.", echo=FALSE}
+#par(mar = c(4, 4, .2, .1))
+plot(cars)  # a scatterplot
+```
+
+
+-----------------
+
+# table example 
+
+## test2
+
+Also see Equation \@ref(eq:mean).
+
+\begin{equation}
+\bar{X} = \frac{\sum_{i=1}^n X_i}{n} (\#eq:mean)
+\end{equation}
+
+And see Table \@ref(tab:mtcars).
+
+```{r mtcars, echo=FALSE}
+knitr::kable(mtcars[1:5, 1:5], caption = "The mtcars data.")
+```
+
+And see Table \@ref(tab:mtcars2).
+
+```{r mtcars2, echo=FALSE}
+knitr::kable(mtcars[1:5, 1:5], caption = "The mtcars data.")
+```
+
+
+
+
+
+
+
+```{r mtcars3, echo=FALSE}
+knitr::kable(mtcars[1:5, 1:5], caption = "The mtcars data.")
+```
+
+```{r mtcars4, echo=FALSE}
+knitr::kable(mtcars[1:5, 1:5], caption = "The mtcars data.")
+```
+
+
+```{r mtcars5, echo=FALSE}
+knitr::kable(mtcars[1:5, 1:5], caption = "The mtcars data.")
+```

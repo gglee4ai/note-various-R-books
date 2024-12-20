@@ -1,0 +1,331 @@
+---
+title: "Chapter 2"
+output: html_notebook
+---
+
+# 2 Data structures
+
+## 2.1 Vectors
+
+```{r}
+dbl_var <- c(1, 2.5, 4.5)
+int_var <- c(1L, 6L, 10L)
+log_var <- c(TRUE, FALSE, T, F)
+chr_var <- c("these are", "some strings")
+log_var
+```
+
+```{r}
+c(1, c(2, c(3, 4)))
+c(1, 2, 3, 4)
+```
+
+```{r}
+c(NA, NA_real_, NA_integer_, NA_character_)
+```
+
+```{r}
+typeof(int_var)
+is.integer(int_var)
+is.atomic(int_var)
+typeof(dbl_var)
+is.double(dbl_var)
+is.atomic(dbl_var)
+```
+
+```{r}
+is.numeric(int_var)
+is.numeric(dbl_var)
+```
+
+```{r}
+str(c(TRUE, 1L, 1.5, "s"))
+```
+
+```{r}
+x <- c(FALSE, FALSE, TRUE)
+as.numeric(x)
+sum(x)
+mean(x)
+```
+
+```{r}
+as.character(1)
+as.double(2L)
+as.integer(1.1)
+as.logical(0)
+```
+
+```{r}
+x <- list(1:3, "a", c(TRUE, FALSE, TRUE), c(2.3, 5.9))
+str(x)
+```
+
+```{r}
+x <- list(list(list(list())))
+str(x)
+is.recursive(x)
+```
+
+```{r}
+x <- list(list(1, 2), c(3, 4))
+y <- c(list(1, 2), c(3, 4))
+str(x)
+str(y)
+```
+
+```{r}
+is.list(mtcars)
+```
+
+```{r}
+unlist(mtcars)
+```
+
+```{r}
+mod <- lm(mpg ~ wt, data = mtcars)
+is.list(mod)
+```
+
+```{r}
+1 == "1"
+-1 < FALSE # -1 < 0
+"one" < 2
+c(FALSE, NA_character_)
+```
+
+## 2.2 Attributes
+
+```{r}
+y <- 1:10
+attr(y, "my_attribute") <- "This is a vector"
+attr(y, "my_attribute")
+```
+
+```{r}
+attributes(y)
+str(y)
+```
+
+```{r}
+str(attributes(y))
+```
+
+```{r}
+x <- structure(1:10, my_attribute = "This is a vector")
+x
+```
+
+```{r}
+attributes(y[1])
+attributes(sum(y))
+```
+
+```{r}
+x <- matrix(1:10)
+x
+rownames(x) <- as.character(1:10)
+x
+rownames(x)
+dim(x)
+class(x)
+```
+
+```{r}
+x <- c(a = 1, b = 2, c = 3)
+x
+```
+
+```{r}
+x <- 1:3
+names(x) <- c("a", "b", "c")
+x
+```
+
+```{r}
+x <- 1:3
+names(x)[[1]] <- c("a")
+x
+```
+
+```{r}
+x <- setNames(x, c("d", "e", "f"))
+x
+```
+
+```{r}
+y <- c(a = 1, 2, 3)
+names(y)
+```
+
+```{r}
+v <- c(1, 2, 3)
+names(v) <- c("a")
+names(v)
+```
+
+```{r}
+z <- c(1, 2, 3)
+names(z)
+```
+
+```{r}
+unname(v)
+names(v) <- NULL
+v
+```
+
+```{r}
+x <- factor(c("a", "b", "b", "a"))
+x
+
+class(x)
+levels(x)
+x[2] <- "c"
+```
+
+```{r}
+c(factor("a"), factor("b"))
+```
+
+```{r}
+sex_char <- c("m", "m", "m")
+sex_factor <- factor(sex_char, levels = c("m", "f"))
+table(sex_char)
+table(sex_factor)
+```
+
+```{r}
+z <- read.csv(text = "value\n12\n1\n.\n9")
+z
+```
+
+```{r}
+as.double(z$value)
+```
+
+```{r}
+structure(1:5, comment = "my attribute")
+```
+
+```{r}
+f1 <- factor(letters)
+levels(f1) <- rev(levels(f1))
+f1
+```
+
+```{r}
+f2 <- rev(factor(letters))
+f2
+```
+
+```{r}
+f3 <- factor(letters, levels = rev(letters))
+f3
+```
+
+## 2.3 Matrices and arrays
+
+```{r}
+a <- matrix(1:6, ncol = 3, nrow = 2)
+a
+```
+
+```{r}
+b <- array(1:12, c(2, 3, 2))
+b
+```
+
+```{r}
+c <- 1:6
+dim(c) <- c(3, 2)
+c
+```
+
+```{r}
+length(a)
+nrow(a)
+ncol(a)
+```
+
+```{r}
+rownames(a) <- c("A", "B")
+colnames(a) <- c("a", "b", "c")
+a
+```
+
+```{r}
+length(b)
+dim(b)
+dimnames(b) <- list(c("one", "two"), c("a", "b", "c"), c("A", "B"))
+b
+```
+
+```{r}
+str(1:3)
+str(matrix(1:3, ncol = 1))
+str(matrix(1:3, nrow = 1))
+str(array(1:3, 3))
+```
+
+```{r}
+l <- list(1:3, "a", TRUE, 1.0)
+dim(l) <- c(2, 2)
+l
+```
+
+```{r}
+dim(c(1, 2, 3, 1:3))
+```
+
+```{r}
+is.matrix(matrix(1:6))
+is.array(matrix(1:6))
+```
+
+## 2.4 Data frames
+
+```{r}
+df <- data.frame(x = 1:3, y = c("a", "b", "c"))
+str(df)
+```
+
+```{r}
+typeof(df)
+class(df)
+class(df)
+is.data.frame(df)
+```
+
+```{r}
+cbind(df, data.frame(z = 3:1))
+```
+
+```{r}
+rbind(df, data.frame(x = 10, y = "z"))
+```
+
+```{r}
+bad <- data.frame(cbind(a = 1:2, b = c("a", "b")))
+str(bad)
+```
+
+```{r}
+good <- data.frame(a = 1:2, b = c("a", "b"))
+str(good)
+```
+
+```{r}
+df <- data.frame(x = 1:3)
+df$y <- list(1:2, 1:3, 1:4)
+df
+```
+
+```{r}
+data.frame(x = 1:3, y = I(list(1:2, 1:3, 1:4)))
+```
+
+```{r}
+dfm <- data.frame(x = 1:3, y = I(matrix(1:9, nrow = 3)))
+str(dfm)
+```

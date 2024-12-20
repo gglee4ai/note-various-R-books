@@ -1,0 +1,589 @@
+---
+title: "note10"
+output: html_notebook
+---
+
+# 10 Data Manipulation and Related Topics
+
+## 10.1 Nonstandard evaluation
+
+```{r}
+library(lattice)
+```
+
+```{r}
+boxcox.trans <- function(x, lambda) {
+  if (lambda == 0) log(x) else (x^lambda - 1) / lambda
+}
+```
+
+```{r}
+data(Chem97, package = "mlmRev")
+for (p in seq(0, 3, by = 0.5)) {
+  plot(
+    qqmath(
+      ~ boxcox.trans(gcsescore, p) | gender,
+      data = Chem97,
+      f.value = ppoints(100),
+      main = as.expression(substitute(lambda == v, list(v = p)))
+    )
+  )
+}
+```
+
+```{r}
+form <- ~ boxcox.trans(gcsescore, p) | gender
+qqboxcox <- function(lambda) {
+  for (p in lambda) {
+    plot(
+      qqmath(
+        ~ boxcox.trans(gcsescore, p) | gender,
+        data = Chem97,
+        f.value = ppoints(100),
+        main = as.expression(substitute(lambda == v, list(v = p)))
+      )
+    )
+  }
+}
+qqboxcox(lambda = seq(0, 3, by = 0.5))
+```
+
+## 10.2 The extended formula interface
+
+```{r}
+Titanic1 <- as.data.frame(as.table(Titanic[, , "Adult", ]))
+Titanic1
+```
+
+```{r}
+barchart(
+  Class ~ Freq | Sex,
+  data = Titanic1,
+  groups = Survived,
+  stack = TRUE,
+  auto.key = list(title = "Survived", columns = 2)
+)
+```
+
+```{r}
+Titanic2 <-
+  reshape(Titanic1,
+    direction = "wide", v.names = "Freq",
+    idvar = c("Class", "Sex"), timevar = "Survived"
+  )
+names(Titanic2) <- c("Class", "Sex", "Dead", "Alive")
+Titanic2
+```
+
+```{r}
+barchart(Class ~ Dead + Alive | Sex,
+  data = Titanic2, stack = TRUE,
+  auto.key = list(columns = 2)
+)
+```
+
+```{r}
+barchart(Class ~ Dead + Alive | Sex,
+  data = Titanic2,
+  stack = TRUE,
+  outer = TRUE,
+  auto.key = list(columns = 2)
+)
+```
+
+```{r}
+data(Gcsemv, package = "mlmRev")
+Gcsemv
+```
+
+```{r}
+xyplot(
+  written ~ course | gender,
+  data = Gcsemv,
+  type = c("g", "p", "smooth"),
+  xlab = "Coursework score",
+  ylab = "Written exam score",
+  panel = function(x, y, ...) {
+    panel.xyplot(x, y, ...)
+    panel.rug(x = x[is.na(y)], y = y[is.na(x)])
+  }
+)
+```
+
+```{r}
+qqmath(~ written + course,
+  data = Gcsemv,
+  type = c("p", "g"),
+  outer = TRUE,
+  groups = gender,
+  auto.key = list(columns = 2),
+  f.value = ppoints(200),
+  ylab = "Score"
+)
+```
+
+## 10.3 Combining data sources with make.groups()
+
+```{r}
+x1 <- rexp(2000)
+x1 <- x1[x1 > 1]
+x2 <- rexp(1000)
+```
+
+```{r}
+qqmath(~ x1 + x2, distribution = qexp)
+```
+
+```{r}
+qqmath(~ c(x1, x2),
+  distribution = qexp,
+  groups = rep(c("x1", "x2"), c(length(x1), length(x2)))
+)
+```
+
+```{r}
+df1 <- data.frame(group = "x1", value = x1)
+df2 <- data.frame(group = "x2", value = x2)
+df <- rbind(df1, df2)
+qqmath(~value,
+  data = df,
+  distribution = qexp,
+  groups = group
+)
+```
+
+```{r}
+str(make.groups(x1, x2))
+```
+
+```{r}
+qqmath(~data, make.groups(x1, x2),
+  groups = which,
+  distribution = qexp,
+  aspect = "iso",
+  type = c("p", "g")
+)
+```
+
+```{r}
+str(beaver1)
+```
+
+```{r}
+str(beaver2)
+```
+
+```{r}
+beavers <- make.groups(beaver1, beaver2)
+str(beavers)
+```
+
+```{r}
+beavers
+```
+
+```{r}
+beavers$hour <-
+  with(beavers, time %/% 100 + 24 * (day - 307) + (time %% 100) / 60)
+```
+
+```{r}
+xyplot(
+  temp ~ hour | which,
+  data = beavers,
+  groups = activ,
+  auto.key = list(text = c("inactive", "active"), columns = 2),
+  xlab = "Time(hours)",
+  ylab = "Body Temperature (C)",
+  scales = list(x = list(relation = "sliced"))
+)
+```
+
+## 10.4 Subsetting
+
+```{r}
+barchart(
+  Class ~ Freq | Sex,
+  data = as.data.frame(Titanic),
+  subset = (Age == "Adult"),
+  groups = Survived,
+  stack = TRUE,
+  auto.key = list(title = "Survived", columns = 2)
+)
+```
+
+```{r}
+data(USAge.df, package = "latticeExtra")
+head(USAge.df)
+```
+
+```{r}
+xyplot(
+  Population ~ Age | factor(Year),
+  data = USAge.df,
+  groups = Sex,
+  subset = Year %in% seq(1905, 1975, by = 10),
+  type = c("l", "g"),
+  auto.key = list(points = FALSE, lines = TRUE, columns = 2)
+)
+```
+
+```{r}
+USAge.df |>
+  subset(Age %in% c(0, 10, 20)) |>
+  xyplot(
+    data = _,
+    Population ~ Year | factor(Age),
+    groups = Sex,
+    type = "l",
+    strip = FALSE,
+    strip.left = TRUE,
+    layout = c(1, 3),
+    ylab = "Population (millions)",
+    auto.key = list(lines = TRUE, points = FALSE, columns = 2)
+  )
+```
+
+```{r}
+xyplot(
+  Population ~ Year | factor(Year - Age),
+  data = USAge.df,
+  groups = Sex,
+  subset = (Year - Age) %in% 1894:1905,
+  type = c("g", "l"),
+  ylab = "Population (millions)",
+  auto.key = list(lines = TRUE, points = FALSE, columns = 2)
+)
+```
+
+## 10.5 Shingles and related utilities
+
+```{r}
+xyplot(
+  stations ~ mag,
+  data = quakes,
+  jitter.x = TRUE,
+  type = c("p", "smooth"),
+  xlab = "Magnitude (Richter)",
+  ylab = "Number of stations reporting"
+)
+```
+
+```{r}
+quakes$Mag <- equal.count(quakes$mag, number = 10, overlap = 0.2)
+```
+
+```{r, paged.print=FALSE}
+summary(quakes$Mag)
+```
+
+```{r}
+as.character(levels(quakes$Mag))
+```
+
+```{r}
+ps.mag <- plot(quakes$Mag,
+  ylab = "Level",
+  xlab = "Magnitude (Richter)"
+)
+ps.mag
+```
+
+```{r}
+bwp.quakes <-
+  bwplot(
+    stations ~ Mag,
+    data = quakes,
+    xlab = "Magnitude",
+    ylab = "Number of stations reporting"
+  )
+bwp.quakes
+```
+
+```{r, fig.width=4, fig.height=4}
+plot(bwp.quakes, position = c(0, 0, 1, 0.65))
+plot(ps.mag, position = c(0, 0.65, 1, 1), newpage = FALSE)
+```
+
+```{r}
+bwplot(sqrt(stations) ~ Mag, quakes,
+  scales =
+    list(x = list(
+      limits = as.character(levels(quakes$Mag)),
+      rot = 45
+    )),
+  xlab = "Magnitude (Richter)",
+  ylab = expression(sqrt("Number of stations"))
+)
+```
+
+```{r, fig.width=5, fig.height=4}
+qqmath(
+  ~ sqrt(stations) | Mag,
+  data = quakes,
+  type = c("p", "g"),
+  pch = ".",
+  cex = 3,
+  prepanel = prepanel.qqmathline,
+  aspect = "xy",
+  strip = strip.custom(strip.levels = TRUE, strip.names = FALSE),
+  xlab = "Standard normal quantiles",
+  ylab = expression(sqrt("Number of"))
+)
+```
+
+```{r}
+xyplot(stations ~ mag,
+  data = quakes,
+  panel = panel.bwplot,
+  horizontal = FALSE,
+  box.ratio = 0.05
+)
+```
+
+```{r}
+xyplot(
+  sqrt(stations) ~ mag,
+  data = quakes,
+  cex = 0.6,
+  panel = panel.bwplot,
+  horizontal = FALSE,
+  box.ratio = 0.05,
+  xlab = "Magnitude (Richter)",
+  ylab = expression(sqrt("Number of stations"))
+)
+```
+
+```{r}
+state.density <-
+  data.frame(
+    name = state.name,
+    area = state.x77[, "Area"],
+    population = state.x77[, "Population"],
+    region = state.region
+  )
+state.density$density <- with(state.density, population / area)
+```
+
+```{r, fig.width=4, fig.height=4}
+dotplot(
+  reorder(name, density) ~ density,
+  data = state.density,
+  xlab = "population Density (thousands per square mile)"
+)
+```
+
+```{r}
+state.density$Density <-
+  shingle(state.density$density,
+    intervals = rbind(c(0, 0.2), c(0.2, 1))
+  )
+```
+
+```{r, fig.width=4, fig.height=4}
+dotplot(
+  reorder(name, density) ~ density | Density,
+  data = state.density,
+  strip = FALSE,
+  layout = c(2, 1),
+  levels.fos = 1:50,
+  scales = list(x = "free"),
+  between = list(x = 0.5),
+  xlab = "Population Density (thousands per square mile)",
+  par.settings = list(layout.widths = list(panel = c(2, 1)))
+)
+```
+
+```{r, fig.width=3.5, fig.height=3.5}
+cutAndStack <-
+  function(x, number = 6, overlap = 0.1, type = "l", xlab = "Time",
+           ylab = deparse(substitute(x)), ...) {
+    time <- if (is.ts(x)) time(x) else seq_along(x)
+    Time <- equal.count(as.numeric(time), number = number, overlap = overlap)
+    xyplot(as.numeric(x) ~ time | Time,
+      type = type, xlab = xlab, ylab = ylab,
+      default.scales = list(
+        x = list(relation = "free"),
+        y = list(relation = "free")
+      ),
+      ...
+    )
+  }
+
+cutAndStack(EuStockMarkets[, "DAX"],
+  overlap = 0,
+  # aspect = "xy",
+  layout = c(1, 6),
+  scales = list(x = list(draw = FALSE), y = list(rot = 0))
+)
+```
+
+```{r}
+xyplot(EuStockMarkets[, "DAX"],
+  type = c("g", "l")
+)
+```
+
+## 10.6 Ordering levels of categorical variables
+
+```{r, fig.width=3.5, fig.height=3.5}
+dotplot(
+  reorder(name, density) ~ 1000 * Density,
+  data = state.density,
+  scales = list(x = list(log = 10)),
+  xlab = "Density (per square mile)"
+)
+```
+
+```{r}
+state.density$region <-
+  with(state.density, reorder(region, density, median))
+state.density
+```
+
+```{r}
+state.density$name <-
+  with(
+    state.density,
+    reorder(reorder(name, density), as.numeric(region))
+  )
+```
+
+```{r, fig.width=3.5, fig.height=3.5}
+p1 <-
+  dotplot(name ~ 1000 * density | region,
+    data = state.density,
+    strip = FALSE,
+    strip.left = TRUE,
+    layout = c(1, 4),
+    scales = list(x = list(log = 10), y = list(relation = "free")),
+    xlab = "Density(per square mile"
+  )
+p1
+```
+
+```{r}
+library(latticeExtra)
+```
+
+```{r, fig.width=3.5, fig.height=3.5}
+p1
+resizePanels()
+```
+
+```{r, fig.width=6, fig.height=6}
+data(USCancerRates)
+xyplot(
+  rate.male ~ rate.female | state,
+  data = USCancerRates,
+  aspect = "iso",
+  pch = ".",
+  cex = 2,
+  index.cond = function(x, y) {
+    median(y - x, na.rm = TRUE)
+  },
+  scales = list(log = 2, at = c(75, 150, 300, 600)),
+  panel = function(...) {
+    panel.grid(h = -1, v = -1)
+    panel.abline(0, 1)
+    panel.xyplot(...)
+  },
+  xlab = "Deaths Due to Cancer Among Females (per 100,000)",
+  ylab = "Deaths Due to Cancer Among Maels (per 100,000)",
+  layout = c(7, 7),
+  par.strip.text = list(cex = 0.9)
+)
+```
+
+## 10.7 Controlling the appearance of strips
+
+```{r}
+strip.style4 <- function(..., style) {
+  strip.default(..., style = 4)
+}
+
+data(Chem97, package = "mlmRev")
+qqmath(
+  ~ gcsescore | factor(score),
+  data = Chem97,
+  groups = gender,
+  type = c("l", "g"),
+  aspect = "xy",
+  auto.key = list(points = FALSE, lines = TRUE, columns = 2),
+  f.value = ppoints(100),
+  strip = strip.style4,
+  xlab = "Standard normal quantiles",
+  ylab = "Average GCSE score"
+)
+```
+
+```{r}
+qqmath(
+  ~ gcsescore | factor(score),
+  data = Chem97,
+  groups = gender,
+  type = c("l", "g"),
+  aspect = "xy",
+  auto.key = list(points = FALSE, lines = TRUE, columns = 2),
+  f.value = ppoints(100),
+  strip = strip.custom(style = 4),
+  xlab = "Standard normal quantiles",
+  ylab = "Average GCSE score"
+)
+```
+
+```{r}
+strip.combined <-
+  function(which.given, which.panel, factor.levels, ...) {
+    if (which.given == 1) {
+      panel.rect(0, 0, 1, 1, col = "grey90", border = 1)
+      panel.text(
+        x = 0, y = 0.5, pos = 4,
+        lab = factor.levels[which.panel[which.given]]
+      )
+    }
+    if (which.given == 2) {
+      panel.text(
+        x = 1, y = 0.5, pos = 2,
+        lab = factor.levels[which.panel[which.given]]
+      )
+    }
+  }
+
+qqmath(
+  ~ gcsescore | factor(score) + gender,
+  data = Chem97,
+  f.value = ppoints(100),
+  type = c("l", "g"),
+  aspect = "xy",
+  strip = strip.combined,
+  par.strip.text = list(lines = 0.5),
+  xlab = "Standard normal quantiles",
+  ylab = "Average GCSE score"
+)
+```
+
+## 10.8 An Example Revisited
+
+```{r}
+p1 <- stripplot(
+  sqrt(abs(residuals(lm(yield ~ variety + year + site)))) ~ site,
+  data = barley,
+  groups = year,
+  jitter.data = TRUE,
+  auto.key = list(points = TRUE, lines = TRUE, columns = 2),
+  type = c("p", "a"),
+  fun = median,
+  ylab = expression(abs("Residual Barley Yield")^{
+    1 / 2
+  })
+)
+p1
+```
+
+```{r}
+morris <- barley$site == "Morris"
+barley$year[morris] <-
+  ifelse(barley$year[morris] == "1931", "1932", "1931")
+p1
+```

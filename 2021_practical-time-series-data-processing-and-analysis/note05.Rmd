@@ -1,0 +1,252 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+load("./data-tidied/dataset.rdata")
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(ggplot2)
+theme_set(theme_gray(base_family = "NanumGothic"))
+```
+
+# 5 시계열 forecasting Part I - 기초 개념
+
+## 5.1 정상성, 비정상성
+
+## 5.2지연과 차분
+
+```{r}
+students |>
+  select(연도, 학생수계) |>
+  mutate(
+    lag1 = lag(학생수계, 1),
+    lag3 = lag(학생수계, 3)
+  )
+```
+
+```{r}
+library(timetk)
+students |>
+  select(연도, 학생수계) |>
+  mutate(
+    lag1 = lag_vec(학생수계, lag = 1),
+    lag3 = lag_vec(학생수계, lag = 3)
+  )
+```
+
+```{r}
+stats::lag(students.xts$학생수계, 1)
+```
+
+```{r}
+students |>
+  select(연도, 학생수계) |>
+  mutate(
+    lag1 = lag(학생수계, 1),
+    lag3 = lag(학생수계, 3),
+    diff1 = c(NA, diff(학생수계, lag = 1)),
+    diff3 = c(NA, NA, NA, diff(학생수계, lag = 3))
+  )
+```
+
+```{r}
+students |>
+  select(연도, 학생수계) |>
+  mutate(
+    diff1 = diff_vec(학생수계, lag = 1),
+    diff3 = diff_vec(학생수계, lag = 3)
+  )
+```
+
+```{r}
+diff(students.xts$학생수계, 1)
+```
+
+## 5.3 ACF와 PACF
+
+```{r}
+acf(students$학생수계)
+```
+
+```{r}
+acf(students$학생수계, plot = FALSE)
+```
+
+```{r}
+students |>
+  select(학생수계) |>
+  forecast::Acf()
+```
+
+```{r}
+students |>
+  select(학생수계) |>
+  forecast::ggAcf()
+```
+
+```{r}
+students |>
+  select(학생수계) |>
+  forecast::ggAcf(plot = FALSE)
+```
+
+```{r}
+students |>
+  select(연도, 학생수계) |>
+  timetk::plot_acf_diagnostics(
+    .date_var = 연도,
+    .value = 학생수계,
+    .lag = 14,
+    .show_white_noise_bars = TRUE
+  )
+```
+
+```{r}
+students |>
+  select(학생수계) |>
+  stats::pacf()
+```
+
+```{r}
+students |>
+  select(학생수계) |>
+  stats::pacf(plot = FALSE)
+```
+
+```{r}
+students |>
+  select(학생수계) |>
+  forecast::Pacf()
+```
+
+```{r}
+students |>
+  select(학생수계) |>
+  forecast::Pacf(plot = FALSE)
+```
+
+```{r}
+students |>
+  select(학생수계) |>
+  forecast::ggPacf()
+```
+
+```{r}
+students |>
+  select(학생수계) |>
+  forecast::ggPacf(plot = FALSE)
+```
+
+## 5.4 적합값과 잔차
+
+```{r}
+students.ts.lm <- forecast::tslm(students.ts[, 2] ~ trend, data = students.ts)
+students.ts.lm
+```
+
+```{r}
+fitted(students.ts.lm)
+```
+
+```{r}
+residuals(students.ts.lm)
+```
+
+```{r}
+plot(students.ts[, 2])
+lines(fitted(students.ts.lm), col = "red")
+```
+
+## 5.5 백색잡음
+
+```{r}
+library(forecast)
+data(goog200, package = "fpp2")
+checkresiduals(goog200)
+```
+
+## 5.6 시계열 분해
+
+```{r}
+try(students.ts[, 2] |> decompose())
+```
+
+```{r}
+employees.ts[, 2] |>
+  stl(s.window = "periodic") |>
+  autoplot()
+```
+
+## 5.7 정상성 테스트
+
+```{r}
+library(urca)
+employees.ts[, 2] |>
+  ur.kpss() |>
+  summary()
+```
+
+```{r}
+forecast::nsdiffs(employees.ts[, 2], alpha = 0.05)
+```
+
+```{r}
+diff(employees.ts[, 2]) |>
+  ur.kpss() |>
+  summary()
+```
+
+## 5.8 계절성 검정
+
+```{r}
+# install.packages("seastests")
+library(seastests)
+```
+
+```{r}
+try(students.ts[, 2] |> combined_test() |> summary())
+```
+
+```{r}
+employees.ts[, 2] |>
+  combined_test() |>
+  summary()
+```
+
+```{r}
+forecast::nsdiffs(employees.ts[, 2])
+```
+
+```{r}
+employees.ts[, 3] |>
+  combined_test() |>
+  summary()
+```
+
+```{r}
+library(forecast)
+employees.ts[, 2] |>
+  decompose() |>
+  seasadj() |>
+  autoplot()
+```
+
+```{r}
+ggseasonplot(employees.ts[, 2],
+  main = "연도별 월간 플롯",
+  ylab = "취업자수",
+  xlab = "월",
+  year.labels = TRUE
+)
+```
+
+```{r}
+ggsubseriesplot(employees.ts[, 2],
+  main = "월별 연간 플롯",
+  ylab = "취업자수",
+  xlab = "월"
+)
+```

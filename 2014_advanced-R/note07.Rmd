@@ -1,0 +1,326 @@
+---
+title: "Chapter 7"
+output: html_notebook
+---
+
+# 7 OO field guide
+
+## 7.1 Base types
+
+```{r}
+f <- function() {}
+typeof(f)
+is.function(f)
+is.object(f)
+
+typeof(sum)
+is.primitive(sum)
+is.object(sum)
+```
+
+## 7.2 S3
+
+```{r}
+library(pryr)
+
+df <- data.frame(x = 1:10, y = factor(letters[1:10]))
+pryr::otype(df)
+pryr::otype(df$x)
+pryr::otype(df$y)
+```
+
+```{r}
+mean
+ftype(mean)
+```
+
+```{r}
+ftype(t.data.frame)
+```
+
+```{r}
+ftype(t.test)
+```
+
+```{r}
+methods("mean")
+```
+
+```{r}
+methods("t.test")
+```
+
+```{r}
+methods(class = "ts")
+```
+
+```{r}
+foo <- structure(list(), class = "foo")
+foo <- list()
+class(foo) <- "foo"
+foo
+```
+
+```{r}
+class(foo)
+inherits(foo, "foo")
+```
+
+```{r}
+foo <- function(x) {
+  if (!is.numeric(x)) stop("X must be numeric")
+  structure(list(x), class = "foo")
+}
+foo(1)
+```
+
+```{r}
+mod <- lm(log(mpg) ~ log(disp), data = mtcars)
+class(mod)
+print(mod)
+# class(mod) <- "data.frame"
+# print(mod)
+# mod$coefficients
+```
+
+```{r}
+f <- function(x) UseMethod("f")
+f.a <- function(x) "Class a"
+
+a <- structure(list(), class = "a")
+class(a)
+f(a)
+```
+
+```{r}
+mean.a <- function(x) "a"
+mean(a)
+```
+
+```{r}
+f <- function(x) UseMethod("f")
+f.a <- function(x) "Class a"
+f.default <- function(x) "Unknown class"
+f(structure(list(), class = "a"))
+f(structure(list(), class = c("b", "a")))
+f(structure(list(), class = "c"))
+```
+
+```{r}
+c <- structure(list(), class = "c")
+f.default(c)
+f.a(c)
+```
+
+```{r}
+iclass <- function(x) {
+  if (is.object(x)) {
+    stop("x is not a primitive type", call. = FALSE)
+  }
+
+  c(
+    if (is.matrix(x)) "matrix",
+    if (is.array(x) && !is.matrix(x)) "array",
+    if (is.double(x)) "double",
+    if (is.integer(x)) "integer",
+    mode(x)
+  )
+}
+iclass(matrix(1:5))
+#> [1] "matrix"  "integer" "numeric"
+iclass(array(1.5))
+#> [1] "array"   "double"  "numeric"
+```
+
+```{r}
+y <- 1
+g <- function(x) {
+  y <- 2
+  UseMethod("g")
+}
+g.numeric <- function(x) y
+g(10)
+
+h <- function(x) {
+  x <- 10
+  UseMethod("h")
+}
+h.character <- function(x) paste("char", x)
+h.numeric <- function(x) paste("num", x)
+
+h("a")
+h(10)
+```
+
+```{r}
+f <- function() 1
+g <- function() 2
+class(g) <- "function"
+
+class(f)
+class(g)
+
+length.function <- function(x) "function"
+length(f)
+length(g)
+```
+
+## 7.3 S4
+
+```{r}
+library(stats4)
+y <- c(26, 17, 13, 12, 20, 5, 9, 8, 5, 4, 8)
+nLL <- function(lambda) -sum(dpois(y, lambda, log = TRUE))
+fit <- mle(nLL, start = list(lambda = 5), nobs = length(y))
+
+# An S4 object
+isS4(fit)
+otype(fit)
+
+# An S4 generic
+isS4(nobs)
+ftype(nobs)
+
+# Retrieve an S4 method, described later
+mle_nobs <- method_from_call(nobs(fit))
+isS4(mle_nobs)
+ftype(mle_nobs)
+```
+
+```{r}
+is(fit)
+is(fit, "mle")
+```
+
+```{r}
+setClass("Person",
+  slots = list(name = "character", age = "numeric")
+)
+setClass("Employee",
+  slots = list(boss = "Person"),
+  contains = "Person"
+)
+
+alice <- new("Person", name = "Alice", age = 40)
+john <- new("Employee", name = "John", age = 20, boss = alice)
+```
+
+```{r}
+alice@age
+```
+
+```{r}
+slot(john, "boss")
+```
+
+```{r}
+setClass("RangedNumeric",
+  contains = "numeric",
+  slots = list(min = "numeric", max = "numeric")
+)
+rn <- new("RangedNumeric", 1:10, min = 1, max = 10)
+rn@min
+rn@.Data
+```
+
+```{r}
+setGeneric("union")
+#> [1] "union"
+setMethod(
+  "union",
+  c(x = "data.frame", y = "data.frame"),
+  function(x, y) {
+    unique(rbind(x, y))
+  }
+)
+```
+
+```{r}
+setGeneric("myGeneric", function(x) {
+  standardGeneric("myGeneric")
+})
+```
+
+```{r}
+# From methods: takes generic name and class names
+selectMethod("nobs", list("mle"))
+
+# From pryr: takes an unevaluated function call
+method_from_call(nobs(fit))
+```
+
+## 7.4 RC
+
+```{r}
+Account <- setRefClass("Account")
+Account$new()
+```
+
+```{r}
+Account <- setRefClass("Account",
+  fields = list(balance = "numeric")
+)
+
+a <- Account$new(balance = 100)
+a$balance
+#> [1] 100
+a$balance <- 200
+a$balance
+```
+
+```{r}
+b <- a
+b$balance
+#> [1] 200
+a$balance <- 0
+b$balance
+```
+
+```{r}
+c <- a$copy()
+c$balance
+#> [1] 0
+a$balance <- 100
+c$balance
+```
+
+```{r}
+Account <- setRefClass("Account",
+  fields = list(balance = "numeric"),
+  methods = list(
+    withdraw = function(x) {
+      balance <<- balance - x
+    },
+    deposit = function(x) {
+      balance <<- balance + x
+    }
+  )
+)
+```
+
+```{r}
+a <- Account$new(balance = 100)
+a$deposit(100)
+a$balance
+```
+
+```{r}
+NoOverdraft <- setRefClass("NoOverdraft",
+  contains = "Account",
+  methods = list(
+    withdraw = function(x) {
+      if (balance < x) stop("Not enough money")
+      balance <<- balance - x
+    }
+  )
+)
+accountJohn <- NoOverdraft$new(balance = 100)
+accountJohn$deposit(50)
+accountJohn$balance
+#> [1] 150
+try(accountJohn$withdraw(200))
+```
+
+## 7.5 Picking a system
+
+## 7.6 Quiz answers

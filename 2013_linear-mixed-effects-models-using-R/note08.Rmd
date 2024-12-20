@@ -1,0 +1,105 @@
+---
+title: "note08"
+output: html_notebook
+---
+
+# 8 Fitting Linear Models with Heterogeneous Variance: The gls() Function
+
+```{r}
+library(nlme)
+```
+
+
+## 8.2 Variance-Function Representation: The varFunc Class
+
+```{r}
+val <- c("12wks" = 0.5, "24wks" = 2)
+val
+```
+
+```{r}
+fix <- c("52wks" = 3)
+fix
+```
+
+```{r}
+data(armd, package = "nlmeU")
+```
+
+```{r}
+frm <- formula(~ 1 | time.f)
+frm
+```
+
+```{r}
+vf0 <- varIdent(value = val, fixed = fix, form = frm)
+vf0
+```
+
+```{r}
+vf0i <- Initialize(vf0, armd)
+vf0
+```
+
+## 8.3 Inspecting and Modifying Objects of Class varFunc
+
+```{r}
+coef(vf0i, unconstrained = FALSE, allCoef = TRUE)
+```
+
+```{r}
+coef(vf0i, unconstrained = FALSE, allCoef = FALSE)
+```
+
+```{r}
+coef(vf0i, unconstrained = TRUE, allCoef = TRUE)
+```
+
+```{r}
+coef(vf0i, unconstrained = TRUE, allCoef = FALSE)
+```
+
+```{r}
+coef(vf0i) <- c(-0.6, 0.7)
+coef(vf0i, allCoef = TRUE)
+```
+
+```{r}
+summary(vf0i)
+```
+
+```{r}
+summary(vf0i)
+```
+
+```{r}
+formula(vf0i)
+```
+
+```{r}
+getCovariate(vf0i)
+```
+
+```{r}
+getGroupsFormula(vf0i)
+```
+
+```{r}
+length(stratum <- getGroups(vf0i))
+```
+
+```{r}
+unique(stratum)
+```
+
+```{r}
+stratum[1:6]
+```
+
+```{r}
+varWeights(vf0i)[1:6]
+```
+
+```{r}
+logLik(vf0i)
+```

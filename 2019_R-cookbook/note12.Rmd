@@ -1,0 +1,396 @@
+---
+title: "note12"
+output: html_notebook
+---
+
+# 12 가지 유용한 트릭
+
+## 12.1 데이터 엿보기
+
+```{r}
+load(file = "./data/lab_df.rdata")
+head(lab_df)
+tail(lab_df)
+```
+
+```{r}
+View(lab_df)
+```
+
+## 12.2 할당 결과 인쇄
+
+```{r}
+x <- 1 / pi
+(x <- 1 / pi)
+```
+
+```{r}
+load(file = "./data/daily.prod.rdata")
+daily.prod
+colSums(daily.prod)
+rowSums(daily.prod)
+```
+
+```{r}
+rbind(daily.prod, Totals = colSums(daily.prod))
+```
+## 12.3 행과 열 합산
+
+
+```{r}
+load(file = './data/daily.prod.rdata')
+daily.prod
+```
+
+
+```{r}
+colSums(daily.prod)
+rowSums(daily.prod)
+```
+
+```{r}
+rbind(daily.prod, Totals=colSums(daily.prod))
+```
+
+## 12.4 열에 데이터 인쇄하기
+
+```{r}
+load(file = "./data/xy.rdata")
+print(x)
+print(y)
+```
+
+```{r}
+cbind(x, y, Total = x + y)
+```
+
+## 12.5 데이터 비닝
+
+```{r}
+x <- rnorm(1000)
+breaks <- c(-3, -2, -1, 0, 1, 2, 3)
+f <- cut(x, breaks)
+summary(f)
+```
+
+```{r}
+f <- cut(x, breaks, labels = c("Bottom", "Low", "Neg", "Pos", "High", "Top"))
+summary(f)
+```
+
+## 12.6 특정 값의 위치 찾기
+
+```{r}
+vec <- c(100, 90, 80, 70, 60, 50, 40, 30, 20, 10)
+match(80, vec)
+which.min(vec)
+which.max(vec)
+```
+
+## 12.7 벡터의 모든 n번째 요소 선택하기
+
+```{r}
+v <- rnorm(10)
+n <- 2
+v[seq_along(v) %% n == 0]
+```
+
+```{r}
+v[c(FALSE, TRUE)]
+```
+
+## 12.8 최소값 또는 최대값 찾기
+
+```{r}
+pmin(1:5, 5:1)
+pmax(1:5, 5:1)
+```
+
+```{r}
+v <- c(-3:3)
+pmax(v, 0)
+```
+
+```{r}
+df <- data.frame(
+  a = c(1, 5, 8),
+  b = c(2, 3, 7),
+  c = c(0, 4, 9)
+)
+df
+```
+
+```{r}
+library(tidyverse)
+df %>%
+  mutate(max_val = pmax(a, b, c))
+```
+
+## 12.9 여러 변수의 모든 조합 생성
+
+```{r}
+sides <- c("Heads", "Tails")
+faces <- c("1 pip", paste(2:6, "pips"))
+sides
+faces
+```
+
+```{r}
+expand.grid(faces, sides)
+```
+
+```{r}
+expand.grid(faces, faces)
+```
+
+```{r}
+expand_grid(faces, faces)
+```
+
+```{r}
+?expand_grid
+```
+
+## 12.10 데이터 프레임 병합하기
+
+```{r}
+load(file = "./data/daily.prod.rdata")
+daily.prod
+```
+
+```{r}
+mean(as.matrix(daily.prod))
+```
+
+## 12.11 데이터 프레임 정렬하기
+
+```{r}
+load(file = "./data/outcome.rdata")
+df
+```
+
+```{r}
+library(dplyr)
+arrange(df, month)
+```
+
+```{r}
+arrange(df, -month)
+```
+
+```{r}
+arrange(df, month, day)
+```
+
+## 12.12 변수에서 속성 제거
+
+```{r}
+load(file = "./data/conf.rdata")
+m <- lm(y ~ x1)
+slope <- coef(m)[2]
+slope
+```
+
+```{r}
+str(slope)
+```
+
+```{r}
+attributes(slope) <- NULL
+slope
+```
+
+```{r}
+attr(slope, "names") <- NULL
+```
+
+## 12.13 객체의 구조 공개하기
+
+```{r}
+load(file = "./data/conf.rdata")
+m <- lm(y ~ x1)
+print(m)
+```
+
+```{r}
+class(m)
+```
+
+```{r}
+mode(m)
+```
+
+```{r}
+names(m)
+```
+
+```{r}
+str(m)
+```
+
+## 12.14 코드 타이밍
+
+```{r}
+library(tictoc)
+tic("making big numbers")
+total_val <- sum(rnorm(1e7))
+toc()
+```
+
+```{r}
+tic("two sums")
+sum(rnorm(10000000))
+sum(rnorm(10000000))
+toc_result <- toc()
+
+print(toc_result)
+```
+
+```{r}
+paste("the code ran in", round((toc_result$toc - toc_result$tic) / 60, 4), "minutes")
+```
+
+```{r}
+start <- Sys.time()
+sum(rnorm(10000000))
+sum(rnorm(10000000))
+Sys.time() - start
+```
+
+## 12.15 경고 및 오류 메시지 억제
+
+```{r}
+library(tseries)
+load("data/adf.rdata")
+results <- adf.test(x)
+```
+
+```{r}
+results <- suppressWarnings(adf.test(x))
+results
+```
+
+```{r}
+warnings()
+```
+
+## 12.16 목록에서 함수 인수 가져오기
+
+```{r}
+vec <- c(1, 3, 5, 7, 9)
+mean(vec)
+```
+
+```{r}
+numbers <- list(1, 3, 5, 7, 9)
+mean(unlist(numbers))
+```
+
+```{r}
+my_lists <-
+  list(
+    col1 = list(7, 8),
+    col2 = list(70, 80),
+    col3 = list(700, 800)
+  )
+my_lists
+```
+
+```{r}
+cbind(my_lists)
+```
+
+```{r}
+cbind(unlist(my_lists))
+```
+
+```{r}
+do.call(cbind, my_lists)
+```
+
+## 12.17 자신만의 이진 연산자 정의하기
+
+```{r}
+"%+-%" <- function(x, margin) {
+  x + c(-1, +1) * margin
+}
+```
+
+```{r}
+100 %+-% (1.96 * 15)
+```
+
+```{r}
+"%+%" <- function(s1, s2) {
+  paste(s1, s2, sep = "")
+}
+"Hello" %+% "World"
+```
+
+```{r}
+"limit=" %+% round(qnorm(1 - 0.05 / 2), 2)
+```
+
+```{r}
+100 %+-% 1.96 * 15
+```
+
+## 12.18 시작 메시지 표시 안 함
+
+```{r}
+# R --quiet
+```
+
+## 12.19 환경 변수 가져오기 및 설정
+
+```{r}
+Sys.getenv()
+```
+
+## 12.20 코드 섹션 사용
+
+```{r}
+# test ----
+```
+
+## 12.21 로컬에서 병렬로 R 실행하기
+
+```{r}
+# devtools::install_github("DavisVaughan/furrr")
+```
+
+```{r}
+simulate_pi <- function(n_iterations) {
+  rand_draws <- matrix(runif(2 * n_iterations, -1, 1), ncol = 2)
+  num_in <- sum(sqrt(rand_draws[, 1]**2 + rand_draws[, 2]**2) <= 1)
+  pi_hat <- (num_in / n_iterations) * 4
+  return(pi_hat)
+}
+simulate_pi(1000000)
+```
+
+```{r}
+library(purrr) # for `map`
+library(tictoc) # for timing our code
+
+draw_list <- as.list(rep(5000000, 200))
+
+tic("simulate pi - single process")
+sims_list <- map(draw_list, simulate_pi)
+toc()
+#> simulate pi - single process: 131.861 sec elapsed
+
+mean(unlist(sims_list))
+```
+
+```{r}
+library(furrr)
+plan(multiprocess)
+
+tic("simulate pi - parallel")
+sims_list <- future_map(draw_list, simulate_pi)
+toc()
+mean(unlist(sims_list))
+```
+
+## 12.22 원격에서 병렬로 R 실행하기

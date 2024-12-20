@@ -1,0 +1,191 @@
+---
+title: "R Notebook"
+#output: html_notebook
+output: html_document
+---
+
+```{r}
+v <- c("apple", "banana", "cherry")
+knitr::combine_words(v)
+## apple, banana, and cherry
+knitr::combine_words(v, before = "`", after = "'")
+## `apple', `banana', and `cherry'
+knitr::combine_words(v, and = "")
+## apple, banana, cherry
+knitr::combine_words(v, sep = " / ", and = "")
+## apple / banana / cherry
+knitr::combine_words(v[1])  # a single word
+## apple
+knitr::combine_words(v[1:2])  # two words
+## apple and banana
+knitr::combine_words(LETTERS[1:5])
+## A, B, C, D, and E
+```
+
+Like Barley Bending  
+
+Like barley bdeing  
+  In low fields by the sea,  
+  
+  
+```{r}
+blogdown:::quote_poem(c("This line", "should be", "broken."))
+## [1] "> This line  \nshould be  \nbroken."
+```
+
+
+
+
+```
+Like barley bending
+　In low fields by the sea,
+Singing in hard wind
+　Ceaselessly;
+
+Like barley bending
+　And rising again,
+So would I, unbroken,
+　Rise from pain;
+
+So would I softly,
+　Day long, night long,
+Change my sorrow
+　Into song.
+
+--- Sara Teasdale
+```
+
+
+
+
+> 
+>
+> Like Barley Bending
+>
+> Like barley bending  
+>　In low fields by the sea,  
+Singing in hard wind  
+>　Ceaselessly;
+>
+> Like barley bending  
+>　And rising again,  
+>So would I, unbroken,  
+>　Rise from pain;
+>
+> So would I softly,  
+>　Day long, night long,  
+>Change my sorrow  
+>　Into song.
+>
+> --- Sara Teasdale
+
+
+
+
+
+
+## 4.13 
+
+
+```{r}
+#install.packages("devtools")
+devtools::install_github("datalorax/equatiomatic")
+```
+
+```{r}
+fit <- lm(mpg ~ cyl + disp, mtcars)
+# show the theoretical model
+equatiomatic::extract_eq(fit)
+```
+
+
+$$
+\operatorname{mpg} = \alpha + \beta_{1}(\operatorname{cyl}) + \beta_{2}(\operatorname{disp}) + \epsilon
+$$
+
+```{r}
+equatiomatic::extract_eq(fit, use_coefs = TRUE)
+```
+
+`r equatiomatic::extract_eq(fit, use_coefs = TRUE)`
+
+
+$$
+\operatorname{mpg} = 34.66 - 1.59(\operatorname{cyl}) - 0.02(\operatorname{disp}) + \epsilon
+$$
+
+$$ `r equatiomatic::extract_eq(fit, use_coefs = TRUE)` $$
+
+
+```{r, mtcars-plots, results='asis'}
+equatiomatic::extract_eq(fit, use_coefs = TRUE)
+```
+
+```{r, animation.hook="gifski"}
+for (i in 1:2) {
+  pie(c(i %% 2, 6), col = c('red', 'yellow'), labels = NA)
+}
+```
+
+
+
+
+
+```{r grvi1}
+DiagrammeR::grViz("digraph {
+  graph [layout = dot, rankdir = TB]
+  
+  node [shape = rectangle]        
+  rec1 [label = 'Step 1. Wake up']
+  rec2 [label = 'Step 2. Write code']
+  rec3 [label =  'Step 3. ???']
+  rec4 [label = 'Step 4. PROFIT']
+  
+  # edge definitions with the node IDs
+  rec1 -> rec2 -> rec3 -> rec4
+  }", 
+  height = 500)
+```
+
+```{r grviz2}
+DiagrammeR::grViz("
+  digraph graph2 {
+  
+  graph [layout = dot, rankdir = LR]
+  
+  # node definitions with substituted label text
+  node [shape = oval]
+  a [label = '@@1']
+  b [label = '@@2']
+  c [label = '@@3']
+  d [label = '@@4']
+  
+  a -> b -> c -> d
+  }
+  
+  [1]: names(iris)[1]
+  [2]: names(iris)[2]
+  [3]: names(iris)[3]
+  [4]: names(iris)[4]
+  ", 
+  height = 100)
+```
+
+Mr. Dervieux. keep the social \ \ \ distance. keep the social \ \ \ distance.keep the social \ \ \ distance.keep the social \ \ \ distance.keep the social \ \ \ distance.keep the social \ \ \ 
+
+keep the social distance. keep the social distance. keep the social distance. keep the social distance. keep the social distance. keep the social distance. keep the social distance. keep the social distance. keep the social distance. keep the social distance. keep the social distance. keep the social distance. keep the social distance. keep the social distance. keep the social distance. keep the social distance. keep the social distance. keep the social distance. 
+
+<!-- I do not want \_italic text\_ here -->
+<!-- \# This is not a heading -->
+
+<!-- your comment -->
+
+
+# Section heading {.unlisted .unnumbered}
+
+
+# Appendix: All code for this report
+
+```{r ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE}
+```
+

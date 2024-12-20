@@ -1,0 +1,224 @@
+---
+title: "Chapter 6"
+output: html_notebook
+---
+
+# 6 효율적인 데이터 다듬기
+
+```{r}
+library(tidyverse)
+library(data.table)
+```
+
+## 6.1 효율적인 데이터 목수 작업을 위한 상위 5가지 팁
+
+1.  처음에 데이터를 준비하는 데 소요되는 시간은 장기적으로 좌절하는 시간을 절약할 수 있습니다.
+2.  'Tidy data'는 데이터를 정리하기 위한 개념을 제공하고, 패키지 tidyr 는 이러한 작업을 위한 몇 가지 기능을 제공합니다.
+3.  tibbledata_frame 패키지 에 의해 정의된 클래스 는 데이터 세트를 인쇄하기 쉽고 작업하기 쉽게 만듭니다.
+4.  dplyr 는 빠르고 직관적인 데이터 처리 기능을 제공합니다. data.table 은 일부 데이터 처리 응용 프로그램에서 타의 추종을 불허하는 속도를 가지고 있습니다.
+5.  %\>% '파이프' 연산자는 복잡한 데이터 처리 워크플로를 명확히 하는 데 도움이 될 수 있습니다 .
+
+## 6.2 tibble이 있는 효율적인 데이터 프레임
+
+```{r}
+tibble(x = 1:3, y = c("A", "B", "C"))
+```
+
+```{r}
+df_base <- data.frame(colA = "A")
+df_base$colA
+df_base$col
+df_base$colB
+```
+
+```{r}
+df_tibble <- tibble(df_base)
+df_base$colA
+df_base$col
+df_base$colB
+```
+
+## 6.3 Tidyr 및 정규 표현식으로 데이터 정리하기
+
+```{r}
+library(efficient)
+data(pew)
+pew
+```
+
+### 6.3.1 넓은 테이블을 길게 만들기`pivot_longer()`
+
+```{r}
+dim(pew)
+pewt <- pivot_longer(pew, -religion, names_to = "income", values_to = "count")
+dim(pewt)
+pewt[c(1:3, 50), ]
+```
+
+```{r}
+pivot_longer(pew, -religion)
+```
+
+### 6.3.2 Split joint variables with `separate()`
+
+```{r}
+agesex <- c("m0-10", "f0-10")
+n <- c(3, 5)
+agesex_df <- tibble(agesex, n)
+separate(agesex_df, agesex, c("sex", "age"), sep = 1)
+```
+
+```{r}
+separate(agesex_df, agesex, c("sex", "age"), sep = 1)
+```
+
+### 6.3.4 정규 표현식
+
+```{r}
+x <- c("Hi I'm Robin.", "DoB 1985", "99")
+
+grepl(pattern = "9", x = x)
+str_detect(string = x, pattern = "9")
+```
+
+```{r}
+grep(pattern = "9", x = x)
+which(str_detect(x, "9"))
+```
+
+## 6.4 dplyr를 사용한 효율적인 데이터 처리
+
+```{r}
+data("ghg_ems", package = "efficient")
+ghg_ems %>%
+  filter(!grepl("World|Europe", Country)) %>%
+  group_by(Country) %>%
+  summarize(
+    Mean = mean(Transportation),
+    Growth = diff(range(Transportation))
+  ) %>%
+  slice_max(Growth, n = 3)
+```
+
+### 6.4.2 열 클래스 변경
+
+```{r}
+wb_ineq %>%
+  mutate(across(5:9, .fns = as.numeric))
+```
+
+```{r}
+cols_to_change <- 5:9
+wb_ineq[cols_to_change] <- data.matrix(wb_ineq[cols_to_change])
+```
+
+### 6.4.4 연결 작업
+
+```{r}
+wb_ineq %>%
+  select(Year, gini) %>%
+  mutate(decade = floor(as.numeric(Year) / 10) * 10) %>%
+  group_by(decade) %>%
+  summarize(mean(gini, na.rm = TRUE))
+```
+
+```{r}
+wb_ineq %>%
+  filter(grepl("g", Country)) %>%
+  group_by(Year) %>%
+  summarize(gini = mean(gini, na.rm = TRUE)) %>%
+  slice_max(gini, n = 5)
+# arrange(desc(gini)) %>%
+# top_n(n = 5)
+```
+
+### 6.4.5 데이터 집계
+
+```{r}
+data(ghg_ems, package = "efficient")
+glimpse(ghg_ems)
+```
+
+```{r}
+ghg_ems %>%
+  group_by(Country) %>%
+  summarize(mean_eco2 = mean(Electricity, na.rm = TRUE))
+```
+
+```{r}
+wb_ineq %>%
+  group_by(Country) %>%
+  summarize(mean_gini = mean(gini, na.rm = TRUE))
+```
+
+```{r}
+ghg_ems
+```
+
+```{r}
+wb_ineq %>%
+  group_by(Country) %>%
+  summarize(
+    obs = n(),
+    med_t10 = median(top10, na.rm = TRUE),
+    sdev = sd(gini, na.rm = TRUE),
+    n30 = sum(gini > 30, na.rm = TRUE),
+    sdn30 = sd(gini[gini > 30], na.rm = TRUE),
+    dif = max(gini, na.rm = TRUE) - min(gini, na.rm = TRUE)
+  )
+```
+
+## 6.5 데이터세트 결합
+
+```{r}
+library(ggmap)
+world <- map_data("world")
+glimpse(world)
+```
+
+```{r}
+world <- world %>% 
+  rename(Country = region)
+```
+
+```{r}
+ghg_ems$All <- rowSums(ghg_ems[3:7], na.rm = TRUE)
+```
+
+```{r}
+unique_countries_ghg_ems <- unique(ghg_ems$Country)
+unique_countries_world <- unique(world$Country)
+matched <- unique_countries_ghg_ems %in% unique_countries_world
+table(matched)
+```
+
+```{r}
+unmatched_countries_ghg_ems = unique_countries_ghg_ems[!matched]
+unmatched_countries_ghg_ems
+```
+
+```{r}
+(unmatched_country = unmatched_countries_ghg_ems[1])
+```
+
+```{r}
+unmatched_world_selection = agrep(pattern = unmatched_country,
+                                  unique_countries_world,
+                                  max.distance = 10)
+unmatched_world_countries = unique_countries_world[unmatched_world_selection]
+unmatched_world_countries
+```
+
+## 6.6 데이터베이스 작업
+
+```{r}
+wb_ineq_dt <- data.table(wb_ineq)
+aus3a = wb_ineq_dt[Country == "Australia"]
+aus3a
+```
+
+```{r}
+setkey(wb_ineq_dt, Country)
+aus3b = wb_ineq_dt[.("Australia")]
+aus3b
+```

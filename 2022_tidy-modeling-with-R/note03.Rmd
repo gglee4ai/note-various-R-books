@@ -1,0 +1,165 @@
+---
+title: "note03"
+output: html_notebook
+---
+
+# 3 R 모델링 기초 검토
+
+## 3.1 예
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+data(crickets, package = "modeldata")
+names(crickets)
+```
+
+```{r}
+crickets %>%
+  ggplot(aes(temp, rate, color = species, pch = species, lty = species)) +
+  geom_point(size = 2) +
+  geom_smooth(method = lm, se = FALSE, alpha = 0.5) +
+  scale_color_brewer(palette = "Paired") +
+  labs(x = "Temperature (C)", y = "Chirp Rate (per minute")
+```
+
+```{r}
+# same meaning
+f1 <- formula(rate ~ temp + species + temp:species)
+f2 <- formula(rate ~ (temp + species)^2)
+f3 <- formula(rate ~ temp * species)
+```
+
+```{r}
+interaction_fit <- lm(rate ~ (temp + species)^2, data = crickets)
+interaction_fit
+```
+
+```{r}
+par(mfrow = c(1, 2))
+plot(interaction_fit, which = 1)
+plot(interaction_fit, which = 2)
+```
+
+```{r}
+main_effect_fit <- lm(rate ~ temp + species, data = crickets)
+main_effect_fit
+```
+
+```{r}
+anova(main_effect_fit, interaction_fit)
+```
+
+```{r}
+summary(main_effect_fit)
+```
+
+```{r}
+summary(interaction_fit)
+```
+
+```{r}
+new_values <- data.frame(species = "O. exclamationis", temp = 15:20)
+predict(main_effect_fit, new_values)
+```
+
+## 3.2 R 공식은 무엇을 합니까?
+
+## 3.3 모델링에서 정리가 중요한 이유
+
+```{r}
+plot_data <- data.frame(
+  x = rnorm(10),
+  y = rnorm(10)
+)
+```
+
+```{r}
+plot(plot_data$x, plot_data$y)
+```
+
+```{r}
+lattice::xyplot(y ~ x, data = plot_data)
+```
+
+```{r}
+ggplot2::ggplot(plot_data, aes(x, y)) +
+  geom_point()
+```
+
+```{r}
+new_values$temp[1] <- NA
+new_values
+```
+
+```{r}
+predict(main_effect_fit, new_values)
+```
+
+```{r}
+try(predict(main_effect_fit, new_values, na.action = ))
+```
+
+```{r}
+predict(main_effect_fit, new_values, na.action = na.omit)
+```
+
+```{r}
+corr_res <- map(mtcars %>% select(-mpg), cor.test, y = mtcars$mpg)
+corr_res[[1]]
+```
+
+```{r}
+library(broom)
+
+tidy(corr_res[[1]])
+```
+
+```{r}
+corr_res %>%
+  map_dfr(tidy, .id = "predictor") %>%
+  ggplot(aes(fct_reorder(predictor, estimate))) +
+  geom_point(aes(y = estimate)) +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = .1) +
+  labs(x = NULL, y = "Correlation with mpg")
+```
+
+## 3.4 기본 R 모델과 TIDYVERSE의 결합
+
+```{r}
+split_by_species <-
+  crickets %>%
+  group_nest(species)
+split_by_species
+```
+
+```{r}
+model_by_species <-
+  split_by_species %>%
+  mutate(model = map(data, ~ lm(rate ~ temp, data = .x)))
+model_by_species
+```
+
+```{r}
+model_by_species %>%
+  mutate(coef = map(model, tidy)) %>%
+  select(species, coef) %>%
+  unnest(coef)
+```
+
+## 3.5 TIDYMODELS 메타패키지
+
+```{r}
+library(tidymodels)
+```
+
+```{r}
+library(conflicted)
+conflict_prefer("filter", winner = "dplyr")
+```
+
+```{r}
+tidymodels_prefer(quiet = FALSE)
+```

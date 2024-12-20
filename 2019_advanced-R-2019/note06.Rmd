@@ -1,0 +1,793 @@
+---
+title: "note06"
+output: html_notebook
+---
+
+# 6 Functions
+
+## 6.1 Introduction
+
+## 6.2 Function fundamentals
+
+```{r}
+f02 <- function(x, y) {
+  x + y
+}
+
+formals(f02)
+```
+
+```{r}
+body(f02)
+```
+
+```{r}
+environment(f02)
+```
+
+```{r}
+attr(f02, "srcref")
+```
+
+```{r}
+sum
+typeof(sum)
+```
+
+```{r}
+`[`
+typeof(`[`)
+```
+
+```{r}
+formals(sum)
+body(sum)
+environment(sum)
+```
+
+```{r}
+f01 <- function(x) {
+  sin(1 / x^2)
+}
+```
+
+```{r}
+lapply(mtcars, function(x) length(unique(x)))
+```
+
+```{r}
+Filter(function(x) !is.numeric(x), mtcars)
+```
+
+```{r}
+integrate(function(x) sin(x)^2, 0, pi)
+```
+
+```{r}
+funs <- list(
+  half = function(x) x / 2,
+  double = function(x) x * 2
+)
+funs
+```
+
+```{r}
+funs$double(10)
+```
+
+```{r}
+args <- list(1:10, na.rm = TRUE)
+args
+```
+
+```{r}
+do.call(mean, args)
+```
+
+```{r}
+function(x) sd(x) / mean(x)
+
+f1 <- function(x) (x - min(x)) / (max(x) - min(x))
+f2 <- f1
+f3 <- f1
+```
+
+```{r}
+# function(x) 3()
+```
+
+```{r}
+(function(x) 3)()
+```
+
+```{r}
+is.function(sum)
+is.primitive(sum)
+```
+
+```{r}
+objs <- mget(ls("package:base", all = TRUE), inherits = TRUE)
+funs <- Filter(is.function, objs)
+str(funs)
+```
+
+```{r}
+max(unlist(lapply(funs, function(x) length(formals(x)))))
+```
+
+```{r}
+narg <- unlist(lapply(funs, function(x) length(formals(x))))
+sum(narg == 0)
+```
+
+```{r}
+library(purrr)
+```
+
+```{r}
+n_args <- funs %>%
+  map(formals) %>%
+  map_int(length)
+```
+
+```{r}
+n_args %>%
+  sort(decreasing = TRUE) %>%
+  head()
+```
+
+```{r}
+sum(n_args == 0)
+```
+
+```{r}
+n_args2 <- funs %>%
+  discard(is.primitive) %>%
+  map(formals) %>%
+  map_int(length)
+
+sum(n_args2 == 0)
+```
+
+```{r}
+funs <- Filter(is.primitive, objs)
+length(funs)
+```
+
+## 6.3 Function composition
+
+```{r}
+square <- function(x) x^2
+deviation <- function(x) x - mean(x)
+```
+
+```{r}
+x <- runif(100)
+sqrt(mean(square(deviation(x))))
+```
+
+```{r}
+out <- deviation(x)
+out <- square(out)
+out <- mean(out)
+out <- sqrt(out)
+out
+```
+
+```{r}
+x |>
+  deviation() |>
+  square() |>
+  mean() |>
+  sqrt()
+```
+
+## 6.4 Lexical scoping
+
+```{r}
+x <- 10
+g01 <- function() {
+  x <- 20
+  x
+}
+g01()
+```
+
+```{r}
+x <- 10
+y <- 20
+g02 <- function() {
+  x <- 1
+  y <- 2
+  c(x, y)
+}
+g02()
+```
+
+```{r}
+x <- 2
+g03 <- function() {
+  y <- 1
+  c(x, y)
+}
+g03()
+y
+```
+
+```{r}
+x <- 1
+g04 <- function() {
+  y <- 2
+  i <- function() {
+    z <- 3
+    c(x, y, z)
+  }
+  i()
+}
+g04()
+```
+
+```{r}
+g07 <- function(x) x + 1
+g08 <- function() {
+  g07 <- function(x) x + 100
+  g07(10)
+}
+g08()
+```
+
+```{r}
+g09 <- function(x) x + 100
+g10 <- function() {
+  g09 <- 10
+  g09(g09)
+}
+g10()
+```
+
+```{r}
+g11 <- function() {
+  if (!exists("a")) {
+    a <- 1
+  } else {
+    a <- a + 1
+  }
+  a
+}
+g11()
+g11()
+```
+
+```{r}
+g12 <- function() x + 1
+x <- 15
+g12()
+x <- 20
+g12()
+```
+
+```{r}
+codetools::findGlobals(g12)
+```
+
+```{r}
+environment(g12) <- emptyenv()
+try(g12())
+```
+
+```{r}
+c <- 10
+c(c = c)
+```
+
+```{r}
+f <- function(x) {
+  f <- function(x) {
+    f <- function() {
+      x^2
+    }
+    f() + 1
+  }
+  f(x) * 2
+}
+f(10)
+```
+
+## 6.5 Lazy evaluation
+
+```{r}
+h01 <- function(x) {
+  10
+}
+h01(stop("This is an error!"))
+```
+
+```{r}
+y <- 10
+h02 <- function(x) {
+  y <- 100
+  x + 1
+}
+h02(y)
+```
+
+```{r}
+h02(y <- 1000)
+y
+```
+
+```{r}
+double <- function(x) {
+  message("Calculating...")
+  x * 2
+}
+h03 <- function(x) {
+  c(x, x)
+}
+h03(double(20))
+```
+
+```{r}
+h04 <- function(x = 1, y = x * 2, z = a + b) {
+  a <- 10
+  b <- 100
+  c(x, y, z)
+}
+h04()
+```
+
+```{r}
+h05 <- function(x = ls()) {
+  a <- 1
+  x
+}
+h05()
+```
+
+```{r}
+h05(ls())
+```
+
+```{r}
+h06 <- function(x = 10) {
+  list(missing(x), x)
+}
+str(h06())
+```
+
+```{r}
+args(sample)
+```
+
+```{r}
+sample2 <- function(x, size = NULL, replace = FALSE, prob = NULL) {
+  if (is.null(size)) {
+    size <- length(x)
+  }
+  x[sample.int(length(x), size, replace = replace, prob = prob)]
+}
+```
+
+```{r}
+`%||%` <- function(lhs, rhs) {
+  if (!is.null(lhs)) {
+    lhs
+  } else {
+    rhs
+  }
+}
+sample3 <- function(x, size = NULL, replace = FALSE, prob = NULL) {
+  size <- size %||% length(x)
+  x[sample.int(length(x), size, replace = replace, prob = prob)]
+}
+```
+
+```{r}
+x_ok <- function(x) {
+  !is.null(x) && length(x) == 1 && x > 0
+}
+x_ok(NULL)
+x_ok(1)
+x_ok(1:3)
+```
+
+```{r}
+x_ok2 <- function(x) {
+  !is.null(x) & length(x) == 1 & x > 0
+}
+x_ok2(NULL)
+x_ok2(1)
+x_ok2(1:3)
+```
+
+```{r}
+f2 <- function(x = z) {
+  z <- 100
+  x
+}
+f2()
+```
+
+```{r}
+y <- 10
+f1 <- function(x =
+                 {
+                   y <- 1
+                   2
+                 },
+               y = 0)
+{
+  c(x, y)
+}
+f1()
+```
+
+## 6.6 ... (dot-dot-dot)
+
+```{r}
+i01 <- function(y, z) {
+  list(y = y, z = z)
+}
+i02 <- function(x, ...) {
+  i01(...)
+}
+str(i02(x = 1, y = 2, z = 3))
+```
+
+```{r}
+i03 <- function(...) {
+  list(first = ..1, third = ..3)
+}
+str(i03(1, 2, 3))
+```
+
+```{r}
+i04 <- function(...) {
+  rlang::list2(...)
+}
+str(i04(a = 1, b = 2, ))
+```
+
+```{r}
+x <- list(c(1, 3, NA), c(4, NA, 6))
+str(lapply(x, mean, na.rm = TRUE))
+```
+
+```{r}
+print(factor(letters), max.levels = 4)
+```
+
+```{r}
+print(y ~ x, showEnv = TRUE)
+```
+
+```{r}
+sum(1, 2, 3)
+sum(1, 2, 3, na.omit = TRUE)
+```
+
+```{r}
+mean(1, 2, 3)
+mean(1, 2, 3, na.omit = TRUE)
+```
+
+## 6.7 Exiting a function
+
+```{r}
+j01 <- function(x) {
+  if (x < 10) {
+    0
+  } else {
+    10
+  }
+}
+j01(5)
+j01(15)
+```
+
+```{r}
+j02 <- function(x) {
+  if (x < 10) {
+    return(0)
+  } else {
+    return(10)
+  }
+}
+```
+
+```{r}
+j03 <- function() 1
+j03()
+```
+
+```{r}
+j04 <- function() invisible(1)
+j04()
+(j04())
+```
+
+```{r}
+withVisible(j03)
+```
+
+```{r}
+withVisible(j04)
+```
+
+```{r}
+(a <- 2)
+```
+
+```{r}
+j05 <- function() {
+  stop("I'm an error")
+  return(10)
+}
+try(j05())
+```
+
+```{r}
+j06 <- function(x) {
+  cat("Hello\n")
+  on.exit(cat("Goodbye!\n"), add = TRUE)
+  if (x) {
+    return(10)
+  } else {
+    stop("Error")
+  }
+}
+j06(TRUE)
+```
+
+```{r}
+try(j06(FALSE))
+```
+
+```{r}
+cleanup <- function(dir, code) {
+  old_dir <- setwd(dir)
+  on.exit(setwd(old_dir), add = TRUE)
+
+  opt_opt <- options(stringAsFactors = FALSE)
+  on.exit(options(old_opt, add = TRUE))
+}
+```
+
+```{r}
+with_dir <- function(dir, code) {
+  old <- setwd(dir)
+  on.exit(setwd(old), add = TRUE)
+  force(code)
+}
+getwd()
+with_dir("~", getwd())
+```
+
+```{r}
+j08 <- function() {
+  on.exit(message("a"), add = TRUE)
+  on.exit(message("b"), add = TRUE)
+}
+j08()
+```
+
+```{r}
+j09 <- function() {
+  on.exit(message("a"), add = TRUE, after = FALSE)
+  on.exit(message("b"), add = TRUE, after = FALSE)
+}
+j09()
+```
+
+```{r}
+plot_pdf <- function(code) {
+  pdf("output/test.pdf")
+  on.exit(dev.off(), add = TRUE)
+  plot(1:10)
+}
+plot_pdf()
+```
+
+```{r}
+capture.output2 <- function(code) {
+  temp <- tempfile()
+  on.exit(file.remove(temp), add = TRUE, after = TRUE)
+
+  sink(temp)
+  on.exit(sink(), add = TRUE, after = TRUE)
+
+  force(code)
+  readLines(temp)
+}
+capture.output2(cat("a", "b", "c", sep = "\n"))
+```
+
+```{r}
+capture.output({
+  1
+})
+capture.output2({
+  1
+})
+```
+
+## 6.8 Function forms
+
+```{r}
+x <- 1
+y <- 2
+x + y
+`+`(x, y)
+```
+
+```{r}
+df <- data.frame(a = 1, b = 2, c = 3)
+names(df) <- c("x", "y", "z")
+`names<-`(df, c("x", "y", "z"))
+df
+```
+
+```{r}
+for (i in 1:10) print(i)
+`for`(i, 1:10, print(i))
+```
+
+```{r}
+add <- function(x, y) x + y
+lapply(list(1:3, 4:5), add, 3)
+```
+
+```{r}
+lapply(list(1:3, 4:5), `+`, 3)
+```
+
+```{r}
+k01 <- function(abcdef, bcde1, bcde2) {
+  list(a = abcdef, b1 = bcde1, b2 = bcde2)
+}
+str(k01(1, 2, 3))
+```
+
+```{r}
+str(k01(2, 3, abcdef = 1))
+```
+
+```{r}
+str(k01(2, 3, a = 1))
+```
+
+```{r}
+try(str(k01(1, 3, b = 1)))
+```
+
+```{r}
+`%+%` <- function(a, b) paste0(a, b)
+
+"new " %+% "string"
+```
+
+```{r}
+`% %` <- function(a, b) paste(a, b)
+`%/\\%` <- function(a, b) paste(a, b)
+"a" % % "b"
+"a" %/\% "b"
+```
+
+```{r}
+`%-%` <- function(a, b) paste0("(", a, " %-% ", b, ")")
+"a" %-% "b" %-% "c"
+```
+
+```{r}
+-1
++10
+```
+
+```{r}
+`second<-` <- function(x, value) {
+  x[2] <- value
+  x
+}
+x <- 1:10
+second(x) <- 5L
+x
+```
+
+```{r}
+x <- 1:10
+tracemem(x)
+second(x) <- 6L
+untracemem(x)
+```
+
+```{r}
+`modify<-` <- function(x, position, value) {
+  x[position] <- value
+  x
+}
+modify(x, 1) <- 10
+```
+
+```{r}
+1 + 2 + 3
+`+`(`+`(1 + 2), 3)
+```
+
+```{r}
+1 + (2 + 3)
+`+`(1, `+`(2, 3))
+```
+
+```{r}
+(x <- sample(c(1:10, NA), size = 20, replace = TRUE))
+(y <- runif(20, min = 0, max = 1))
+cor(x = x, y = y, use = "p", method = "kendall")
+```
+
+```{r}
+x <- function(x, method = c("abc", "bde", "ced")) {
+  method <- match.arg(method)
+  method
+}
+x(1, "a")
+```
+
+```{r}
+`randoms<-` <- function(x, value) {
+  x[sample(length(x), 1)] <- value
+  x
+}
+x <- 1:10
+randoms(x) <- 100
+x
+```
+
+```{r}
+`+` <- function(a, b = 0L) {
+  if (is.character(a) && is.character(b)) {
+    paste0(a, b)
+  } else {
+    base::`+`(a, b)
+  }
+}
+
+# Test
++1
+#> [1] 1
+1 + 2
+#> [1] 3
+"a" + "b"
+#> [1] "ab"
+
+# Return back to the original `+` operator
+rm(`+`)
+```
+
+```{r}
+repls <- apropos("<-", where = TRUE, mode = "function")
+head(repls, 30)
+```
+
+```{r}
+repls_base <- repls[names(repls) == length(search())]
+repls_base
+```
+
+```{r}
+library(magrittr)
+repls_base_prim <- mget(repls_base, envir = baseenv()) %>%
+  Filter(is.primitive, .) %>%
+  names()
+
+repls_base_prim
+```
+
+```{r}
+`%xor%` <- function(a, b) {
+  xor(a, b)
+}
+TRUE %xor% TRUE
+FALSE %xor% TRUE
+```
+
+## 6.9 Quiz answers

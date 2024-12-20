@@ -1,0 +1,74 @@
+---
+title: "Chapter 10"
+output: html_notebook
+---
+
+# 10 효율적인 학습
+
+## 10.1 효율적인 학습을 위한 상위 5가지 팁
+
+1.  R의 내부 도움말을 사용하십시오(예: ?, ??, vignette()및 apropos(). 소용돌이 를 시도하십시오 .
+2.  Journal for Statistical Software , R Journal , R 목록 및 'blogosphere' 와 같은 기존 매체의 최신 개발에 대해 읽어보십시오 .
+3.  막히면 도움을 요청하십시오! 재현 가능한 코드를 사용하여 적절한 위치에 게시된 명확한 질문은 빠르고 계몽적인 답변을 얻을 수 있습니다.
+4.  더 깊이 있는 학습을 위해 몰입형 R 책과 튜토리얼을 능가하는 것은 없습니다. 몇 가지 조사를 수행하고 완료해야 할 리소스를 결정하십시오.
+5.  학습을 통합하는 가장 좋은 방법 중 하나는 작성하여 지식을 전달하는 것입니다. 배운 내용에 대한 이야기를 다른 사람에게도 도움이 됩니다.
+
+## 10.2 R의 내부 도움말 사용 하기
+
+1.  특정 주제 에 대한 도움말을 보려면 R 및 설치된 패키지 검색 .
+2.  패키지 비네트 읽기 .
+3.  특정 기능 에 대한 도움말 얻기 .
+4.  소스 코드 를 살펴 봅니다.
+
+### 10.2.1 주제에 대한 R 검색
+
+```{r}
+??optim
+```
+
+```{r}
+help.search(pattern = "optimisation|optimization", fields = c("title", "concept"))
+```
+
+```{r}
+help.search(pattern = "optimisation|optimization", fields = c("title", "concept"), package = "stats")
+```
+
+```{r}
+apropos("optim")
+```
+
+```{r}
+apropos("lm")[1:6] # show only first six results
+```
+
+### 10.2.2 비네트 찾기 및 사용
+
+```{r}
+browseVignettes(package = "benchmarkme")
+```
+
+```{r}
+v = vignette("solutions01", package = "efficient")
+edit(v)
+```
+
+### 10.2.3 기능에 대한 도움말 얻기
+
+```{r}
+?optim
+```
+
+```{r}
+fn <- function(x) {
+  x^4 - x^2
+}
+```
+
+```{r}
+optim(par = 0, fn = fn)
+```
+
+```{r}
+optim(par = 0, fn = fn, method = "Brent", lower = -100, upper = 100)
+```

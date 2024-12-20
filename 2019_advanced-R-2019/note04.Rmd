@@ -1,0 +1,453 @@
+---
+title: "note04"
+output: html_notebook
+---
+
+# 4 Subsetting
+
+## 4.1 Introduction
+
+## 4.2 Selecting multiple elements
+
+```{r}
+x <- c(2.1, 4.2, 3.3, 5.4)
+```
+
+```{r}
+x[c(3, 1)]
+x[order(x)]
+x[c(1, 1)]
+x[c(2.1, 2.9)]
+```
+
+```{r}
+x[-c(3, 1)]
+try(x[c(-1, 2)])
+```
+
+```{r}
+x[c(TRUE, TRUE, FALSE, FALSE)]
+x[x > 3]
+```
+
+```{r}
+x[c(TRUE, FALSE)]
+x[c(TRUE, FALSE, TRUE, FALSE)]
+```
+
+```{r}
+x[c(TRUE, TRUE, NA, FALSE)]
+```
+
+```{r}
+x[]
+```
+
+```{r}
+x[0]
+```
+
+```{r}
+y <- setNames(x, letters[1:4])
+y[c("d", "c", "a")]
+y[c("a", "a", "a")]
+z <- c(abc = 1, def = 2)
+z[c("a", "d")]
+```
+
+```{r}
+y[factor("b")]
+```
+
+```{r}
+a <- matrix(1:9, nrow = 3)
+colnames(a) <- c("A", "B", "C")
+a[1:2, ]
+a[c(TRUE, FALSE, TRUE), c("B", "A")]
+a[0, -2]
+```
+
+```{r}
+a[1, ]
+a[1, 1]
+```
+
+```{r}
+vals <- outer(1:5, 1:5, FUN = "paste", sep = ",")
+vals
+vals[c(4, 15)]
+```
+
+```{r}
+select <- matrix(ncol = 2, byrow = TRUE, c(
+  1, 1,
+  3, 1,
+  2, 4
+))
+vals[select]
+```
+
+```{r}
+df <- data.frame(x = 1:3, y = 3:1, z = letters[1:3])
+df
+```
+
+```{r}
+df[df$x == 2, ]
+df[c(1, 3), ]
+```
+
+```{r}
+df[c("x", "z")]
+df[, c("x", "z")]
+```
+
+```{r}
+str(df["x"])
+```
+
+```{r}
+str(df[, "x"])
+```
+
+```{r}
+df <- tibble::tibble(x = 1:3, y = 3:1, z = letters[1:3])
+
+str(df["x"])
+str(df[, "x"])
+```
+
+```{r}
+a <- matrix(1:4, nrow = 2)
+a
+```
+
+```{r}
+str(a[1, ])
+str(a[1, , drop = FALSE])
+```
+
+```{r}
+df <- data.frame(a = 1:2, b = 1:2)
+df
+```
+
+```{r}
+str(df[, "a"])
+str(df[, "a", drop = FALSE])
+```
+
+```{r}
+z <- factor(c("a", "b"))
+z[1]
+z[1, drop = TRUE]
+```
+
+```{r}
+mtcars[mtcars$cyl == 4, ]
+```
+
+```{r}
+mtcars[-(1:4), ]
+```
+
+```{r}
+mtcars[mtcars$cyl <= 5, ]
+```
+
+```{r}
+mtcars[mtcars$cyl %in% c(4, 6), ]
+```
+
+```{r}
+x <- 1:5
+x[NA]
+x[NA_real_]
+```
+
+```{r}
+x <- outer(1:5, 1:5, FUN = "*")
+upper.tri(x)
+```
+
+```{r}
+x[upper.tri(x)]
+```
+
+```{r}
+mtcars[1:20, ]
+```
+
+```{r}
+diag2 <- function(x) {
+  n <- min(nrow(x), ncol(x))
+  idx <- cbind(seq_len(n), seq_len(n))
+  x[idx]
+}
+```
+
+```{r}
+diag2 <- function(x) {
+  n <- min(nrow(x), ncol(x))
+  idx <- cbind(seq_len(n), seq_len(n))
+
+  x[idx]
+}
+
+(x <- matrix(1:30, 5))
+
+diag(x)
+diag2(x)
+```
+
+## 4.3 Selecting a single element
+
+```{r}
+var <- "cyl"
+mtcars$var
+```
+
+```{r}
+mtcars[[var]]
+```
+
+```{r}
+x <- list(abc = 1)
+x$a
+```
+
+```{r}
+x <- list(
+  a = list(1, 2, 3),
+  b = list(3, 4, 5)
+)
+```
+
+```{r}
+purrr::pluck(x, "a", 1)
+purrr::pluck(x, "c", 1)
+purrr::pluck(x, "c", 1)
+purrr::pluck(x, "c", 1, .default = NA)
+```
+
+```{r}
+purrr::chuck(x, "a", 1)
+try(purrr::chuck(x, "c", 1))
+try(purrr::chuck(x, "c", 1))
+try(purrr::chuck(x, "c", 1, .default = NA))
+```
+
+```{r}
+mtcars$cyl[[3]]
+mtcars[, "cyl"][[3]]
+mtcars$cyl[[3]]
+with(mtcars, cyl[[3]])
+
+mtcars[3, ]$cyl
+mtcars[3, "cyl"]
+mtcars[3, ][, "cyl"]
+mtcars[3, ][["cyl"]]
+
+mtcars[3, 2]
+mtcars[[c(2, 3)]]
+```
+
+```{r}
+mod <- lm(mpg ~ wt, data = mtcars)
+mod$df.residual
+summary(mod)$r.squared
+```
+
+## 4.4 Subsetting and assignment
+
+```{r}
+x <- 1:5
+x[c(1, 2)] <- c(101, 102)
+x
+```
+
+```{r}
+x <- list(a = 1, b = 2)
+x[["b"]] <- NULL
+str(x)
+```
+
+```{r}
+y <- list(a = 1, b = 2)
+y["b"] <- list(NULL)
+str(y)
+```
+
+```{r}
+mtcars1 <- mtcars
+mtcars1[] <- lapply(mtcars1, as.integer)
+is.data.frame(mtcars1)
+```
+
+```{r}
+mtcars2 <- lapply(mtcars, as.integer)
+is.data.frame(mtcars2)
+```
+
+## 4.5 Applications
+
+```{r}
+x <- c("m", "f", "u", "f", "f", "m", "m")
+lookup <- c(m = "Male", f = "Female", u = NA)
+lookup[x]
+```
+
+```{r}
+unname(lookup[x])
+```
+
+```{r}
+grades <- c(1, 2, 2, 3, 1)
+info <- data.frame(
+  grade = 3:1,
+  desc = c("Excellent", "Good", "Poor"),
+  fail = c(F, F, T)
+)
+
+id <- match(grades, info$grade)
+id
+info[id, ]
+```
+
+```{r}
+df <- data.frame(x = c(1, 2, 3, 1, 2), y = 5:1, z = letters[1:5])
+df
+```
+
+```{r}
+df[sample(nrow(df)), ]
+```
+
+```{r}
+df[sample(nrow(df), 3), ]
+```
+
+```{r}
+df[sample(nrow(df), 6, replace = TRUE), ]
+```
+
+```{r}
+x <- c("b", "c", "a")
+order(x)
+x[order(x)]
+```
+
+```{r}
+df2 <- df[sample(nrow(df)), 3:1]
+df2
+```
+
+```{r}
+df2[order(df2$x), ]
+```
+
+```{r}
+df2[, order(names(df2))]
+```
+
+```{r}
+df <- data.frame(x = c(2, 4, 1), y = c(9, 11, 6), n = c(3, 5, 1))
+df
+```
+
+```{r}
+rep(1:nrow(df), df$n)
+```
+
+```{r}
+df[rep(1:nrow(df), df$n), ]
+```
+
+```{r}
+df <- data.frame(x = 1:3, y = 3:1, z = letters[1:3])
+df$z <- NULL
+df
+```
+
+```{r}
+df <- data.frame(x = 1:3, y = 3:1, z = letters[1:3])
+df[c("x", "y")]
+```
+
+```{r}
+df[setdiff(names(df), "z")]
+```
+
+```{r}
+mtcars[mtcars$gear == 5, ]
+mtcars
+```
+
+```{r}
+mtcars[mtcars$gear == 5 & mtcars$cyl == 4, ]
+```
+
+```{r}
+x <- sample(10) < 4
+which(x)
+
+unwhich <- function(x, n) {
+  out <- rep_len(FALSE, n)
+  out[x] <- TRUE
+  out
+}
+unwhich(which(x), 10)
+```
+
+```{r}
+(x1 <- 1:10 %% 2 == 0)
+(x2 <- which(x1))
+(y1 <- 1:10 %% 5 == 0)
+(y2 <- which(y1))
+```
+
+```{r}
+x1 & y1
+intersect(x2, y2)
+```
+
+```{r}
+x1 | y1
+union(x2, y2)
+```
+
+```{r}
+x1 & !y1
+setdiff(x2, y2)
+```
+
+```{r}
+xor(x1, y1)
+setdiff(union(x2, y2), intersect(x2, y2))
+```
+
+```{r}
+mtcars[sample(ncol(mtcars))]
+mtcars[sample(nrow(mtcars)), sample(ncol(mtcars))]
+```
+
+```{r}
+m <- 10
+mtcars[sample(nrow(mtcars), m), ]
+```
+
+```{r}
+start <- sample(nrow(mtcars) - m + 1, 1)
+end <- start + m - 1
+mtcars[start:end, , drop = FALSE]
+```
+
+```{r}
+mtcars[order(names(mtcars))]
+```
+
+```{r}
+mtcars[sort(names(mtcars))]
+```
+
+## 4.6 Quiz answers

@@ -1,0 +1,342 @@
+---
+title: "Chapter 15"
+output: html_notebook
+---
+
+# 15 Global optimization and stochastic methods
+
+## 15.3 An example problem
+
+```{r}
+## ----label=C15rastrigindef, echo=TRUE------------------------------------
+Rastrigin <- function(x) {
+  sum(x^2 - 10 * cos(2 * pi * x)) + 10 * length(x)
+}
+dimension <- 5
+lower <- rep(-5.12, dimension)
+upper <- rep(5.12, dimension)
+start1 <- rep(1, dimension)
+```
+
+### 15.3.1 Method SANN from optim()
+
+```{r}
+## ----label=C15rastriginsann, echo=TRUE-----------------------------------
+myseed <- 1234
+set.seed(myseed)
+asann1 <- optim(par = start1, fn = Rastrigin, method = "SANN", control = list(trace = 1))
+print(asann1)
+```
+
+### 15.3.2 Package GenSA
+
+```{r}
+## ----label=C15rastrigingensa, echo=TRUE----------------------------------
+suppressPackageStartupMessages(require(GenSA))
+global.min <- 0
+tol <- 1e-13
+set.seed(myseed)
+ctrl <- list(threshold.stop = global.min + tol, verbose = TRUE)
+aGenSA1 <- GenSA(
+  lower = lower, upper = upper, fn = Rastrigin,
+  control = ctrl
+)
+print(aGenSA1[c("value", "par", "counts")])
+```
+
+### 15.3.3 Packages DEoptim and RcppDE
+
+```{r}
+## ----label=C15rastrigindeoptim, echo=TRUE--------------------------------
+suppressPackageStartupMessages(require(DEoptim))
+set.seed(myseed)
+ctrl <- list(trace = FALSE)
+aDEopt1a <- DEoptim(lower = lower, upper = upper, fn = Rastrigin, control = ctrl)
+print(aDEopt1a$optim)
+```
+
+```{r}
+set.seed(myseed)
+ctrl <- list(itermax = 10000, trace = FALSE)
+aDEopt1b <- DEoptim(lower = lower, upper = upper, fn = Rastrigin, control = ctrl)
+print(aDEopt1b$optim)
+```
+
+```{r}
+## ----label=C15rastriginrcppde, echo=TRUE---------------------------------
+suppressPackageStartupMessages(require(RcppDE))
+set.seed(myseed)
+ctrl <- list(trace = FALSE)
+aRcppDEopt1a <- DEoptim(lower = lower, upper = upper, fn = Rastrigin, control = ctrl)
+print(aRcppDEopt1a$optim)
+```
+
+```{r}
+set.seed(myseed)
+ctrl <- list(itermax = 10000, trace = FALSE)
+aRcppDEopt1b <- DEoptim(lower = lower, upper = upper, fn = Rastrigin, control = ctrl)
+print(aRcppDEopt1b$optim)
+```
+
+```{r}
+## ----label=C15rastriginrcppde2, echo=TRUE--------------------------------
+set.seed(123456)
+ctrl <- list(itermax = 10000, trace = FALSE)
+aRcppDEopt1b <- DEoptim(lower = lower, upper = upper, fn = Rastrigin, control = ctrl)
+print(aRcppDEopt1b$optim)
+```
+
+### 15.3.4 Package smco
+
+```{r}
+## ----label=C15rastriginsmco, echo=TRUE-----------------------------------
+suppressPackageStartupMessages(require(smco))
+set.seed(myseed)
+asmco1 <- smco(
+  par = rep(1, dimension), LB = lower, UB = upper, fn = Rastrigin,
+  maxiter = 10000, trc = FALSE
+)
+print(asmco1[c("par", "value")])
+```
+
+### 15.3.5 Package soma
+
+```{r}
+## ----label=C15rastriginsoma, echo=TRUE-----------------------------------
+suppressPackageStartupMessages(require(soma))
+suppressPackageStartupMessages(require(reportr))
+# NOTE: Above was not documented in soma!
+setOutputLevel(OL$Warning)
+set.seed(myseed)
+mybounds <- list(min = lower, max = upper)
+myopts <- list(nMigrations = 100)
+asoma1 <- soma(Rastrigin, bounds = mybounds, options = myopts)
+# print(asoma1) # Gives too much output -- not obvious to interpret.
+print(asoma1$population[, asoma1$leader])
+print(Rastrigin(asoma1$population[, asoma1$leader]))
+```
+
+### 15.3.6 Package Rmalschains
+
+```{r}
+## ----label=C15rastriginmalschains, echo=TRUE-----------------------------
+suppressPackageStartupMessages(require(Rmalschains))
+set.seed(myseed)
+amals <- malschains(Rastrigin,
+  lower = lower, upper = upper,
+  maxEvals = 10000, seed = myseed
+)
+print(amals)
+```
+
+### 15.3.7 Package rgenoud
+
+```{r}
+## ----label=C15rastrigingenoud, echo=TRUE---------------------------------
+suppressPackageStartupMessages(require(rgenoud))
+set.seed(myseed)
+agen1 <- genoud(Rastrigin, nvars = dimension, max = FALSE, print.level = 0)
+print(agen1)
+```
+
+### 15.3.8 Package GA
+
+```{r}
+## ----label=C15rastriginGA, echo=TRUE-------------------------------------
+suppressPackageStartupMessages(require(GA))
+set.seed(myseed)
+aGA1 <- ga(
+  type = "real-valued", fitness = function(x) -Rastrigin(x),
+  lower = lower, upper = upper, popSize = 50, maxiter = 1000,
+  monitor = NULL
+)
+print(summary(aGA1))
+```
+
+### 15.3.9 Package gaoptim
+
+```{r}
+# R4.1에 패키지 없음
+# ## ----label=C15rastrigingaopt, echo=TRUE----------------------------------
+# suppressPackageStartupMessages(require(gaoptim))
+# set.seed(myseed)
+# minRast<-function(x) { -Rastrigin(x) } # define for minimizing
+# ## Initial calling syntax -- no selection argument
+# ## agaor1<-GAReal(minRast, lb=lower, ub=upper)
+# agaor1<-GAReal(minRast, lb=lower, ub=upper, selection='uniform')
+# agaor1$evolve(200) # iterate for 200 generations
+# ## The same result was returned from 400 generations
+# agaor1
+
+## ----label=C15rastrigingaopt2, echo=TRUE, fig.height=5-------------------
+# maxRast<-function(x){ sqrt(1/ abs(Rastrigin(x))) }
+# agaor2<-GAReal(maxRast, lb=lower, ub=upper, selection='fitness')
+# agaor2$evolve(200)
+# agaor2
+# plot(agaor2) # note this special method for displaying results
+# Rastrigin(agaor2$bestIndividual())
+```
+
+## 15.4 Multiple starting values
+
+```{r, include=FALSE}
+## ----label=C15rastriginRvmmin1, echo=TRUE--------------------------------
+suppressPackageStartupMessages(require(Rvmmin))
+nrep <- 500
+bestval <- .Machine$double.xmax # start with a big number
+bestpar <- rep(NA, dimension)
+startmat <- matrix(NA, nrow = nrep, ncol = dimension)
+set.seed(myseed)
+for (i in 1:nrep) {
+  for (j in 1:dimension) {
+    startmat[i, j] <- lower[j] + (upper[j] - lower[j]) * runif(1)
+  }
+}
+for (i in 1:nrep) {
+  tstart <- as.vector(startmat[i, ])
+  ans <- Rvmmin(tstart, Rastrigin, lower = lower, upper = upper)
+  if (ans$value <= bestval) {
+    bestval <- ans$value
+    cat("Start ", i, " new best =", bestval, "\n")
+    bestpar <- ans$par
+    bestans <- ans
+  }
+}
+```
+
+```{r}
+print(bestans)
+```
+
+```{r}
+## ----label=C15branin1, echo=TRUE-----------------------------------------
+## branmin.R
+myseed <- 123456L # The user can use any seed. BUT ... some don't work so well.
+branin <- function(x) { ## Branin's test function
+  if (length(x) != 2) stop("Wrong dimensionality of parameter vector")
+  x1 <- x[1] # limited to [-5, 10]
+  x2 <- x[2] # limited to [0, 15]
+  a <- 1
+  b <- 5.1 / (4 * pi * pi)
+  c <- 5 / pi
+  d <- 6
+  e <- 10
+  f <- 1 / (8 * pi)
+  ## Global optima of 0.397887
+  ## at (-pi, 12.275), (pi, 2.275), (9.42478, 2.475)
+  val <- a * (x2 - b * (x1^2) + c * x1 - d)^2 + e * (1 - f) * cos(x1) + e
+}
+branin.g <- function(x) { ## Branin's test function
+  if (length(x) != 2) stop("Wrong dimensionality of parameter vector")
+  x1 <- x[1]
+  x2 <- x[2]
+  a <- 1
+  b <- 5.1 / (4 * pi * pi)
+  c <- 5 / pi
+  d <- 6
+  e <- 10
+  f <- 1 / (8 * pi)
+  ## Global optima of 0.397887
+  ## at (-pi, 12.275), (pi, 2.275), (9.42478, 2.475)
+  #     val <- a*(x2 - b*(x1^2) + c*x1 - d)^2 + e*(1 - f)*cos(x1) + e
+  g1 <- 2 * a * (x2 - b * (x1^2) + c * x1 - d) * (-2 * b * x1 + c) - e * (1 - f) * sin(x1)
+  g2 <- 2 * a * (x2 - b * (x1^2) + c * x1 - d)
+  gg <- c(g1, g2)
+}
+```
+
+```{r}
+## ----label=C15branin2, echo=TRUE-----------------------------------------
+dist2 <- function(va, vb) {
+  n1 <- length(va)
+  n2 <- length(vb)
+  if (n1 != n2) stop("Mismatched vectors")
+  dd <- 0
+  for (i in 1:n1) {
+    dd <- dd + (va[i] - vb[i])^2
+  }
+  dd
+}
+y1 <- c(-pi, 12.275)
+y2 <- c(pi, 2.275)
+y3 <- c(9.42478, 2.475)
+lo <- c(-5, 0)
+up <- c(10, 15)
+npt <- 40
+grid1 <- ((1:npt) - 1) * (up[1] - lo[1]) / (npt - 1) + lo[1]
+grid2 <- ((1:npt) - 1) * (up[2] - lo[2]) / (npt - 1) + lo[2]
+pnts <- expand.grid(grid1, grid2)
+names(pnts) <- c("x1", "x2")
+nrun <- dim(pnts)[1]
+```
+
+```{r, include=FALSE}
+## ----label=C15branin3, echo=FALSE----------------------------------------
+suppressPackageStartupMessages(require(Rvmmin))
+reslt <- matrix(NA, nrow = nrun, ncol = 7)
+names(reslt) <- c("vmin", "bx1", "bx2", "sx1", "sx2", "sval")
+ctrl <- list(maxit = 20000)
+
+cmat <- matrix(" ", nrow = npt, ncol = npt)
+kk <- 0 # for possible use as a progress counter
+for (ii1 in 1:npt) { # row index is ii1 for x2 from grid2, plotted at ii=npt+1-ii1
+  for (jj in 1:npt) { # col index is for x1 on graph
+    ii <- npt + 1 - ii1
+    strt <- c(grid1[jj], grid2[ii1])
+    sval <- branin(strt)
+    ans <- suppressWarnings(
+      Rvmmin(strt, branin, branin.g, lower = lo, upper = up, control = ctrl)
+    )
+    kk <- kk + 1
+    reslt[kk, 4] <- strt[1]
+    reslt[kk, 5] <- strt[2]
+    reslt[kk, 6] <- sval
+    reslt[kk, 1] <- ans$value
+    reslt[kk, 2] <- ans$par[1]
+    reslt[kk, 3] <- ans$par[2]
+    reslt[kk, 7] <- 0
+    if (ans$convergence != 0) {
+      ##     cat("Nonconvergence from start c(",strt[1],", ", strt[2],")\n")
+      reslt[kk, 1] <- .Machine$double.xmax
+    } else {
+      if (dist2(ans$par, y1) < 1e-6) reslt[kk, 7] <- 1
+      if (dist2(ans$par, y2) < 1e-6) reslt[kk, 7] <- 2
+      if (dist2(ans$par, y3) < 1e-6) reslt[kk, 7] <- 3
+    }
+    cmat[ii, jj] <- as.character(reslt[kk, 7])
+  } # end jj
+} # end ii1
+mpts <- kk
+cat("Non convergence from the following starts:\n")
+linetrip <- 0
+for (kk in 1:mpts) {
+  if (reslt[kk, 7] == 0) {
+    cat("(", reslt[kk, 4], ", ", reslt[kk, 5], ")  ")
+    linetrip <- linetrip + 1
+    if (4 * floor(linetrip / 4) == linetrip) cat("\n")
+  }
+}
+```
+
+```{r}
+## ----label=C15branin5, echo=TRUE-----------------------------------------
+zz <- branin(pnts)
+zz <- as.numeric(as.matrix(zz))
+zy <- matrix(zz, nrow = 40, ncol = 40)
+contour(grid1, grid2, zy, nlevels = 25)
+points(y1[1], y1[2], pch = 19, cex = 2)
+points(y2[1], y2[2], pch = 19, cex = 2)
+points(y3[1], y3[2], pch = 19, cex = 2)
+title(main = "Branin function contour plot")
+title(sub = "The solid circles are the three global minima")
+```
+
+```{r}
+## ----label=C15branin4, echo=TRUE, fig.height=7, fig.width=5--------------
+for (ii in 1:npt) {
+  vrow <- paste(cmat[ii, ], sep = " ", collapse = " ")
+  cat(vrow, "\n")
+}
+```
+
+# ----

@@ -1,1 +1,0 @@
-This folder contains full-side slides.

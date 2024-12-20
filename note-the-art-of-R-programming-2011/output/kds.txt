@@ -1,3 +1,0 @@
-"kids" "ages"
-"1" "Jack" 12
-"2" "Jill" 10

@@ -1,0 +1,261 @@
+---
+title: "note02R"
+output: html_notebook
+---
+
+```{r}
+options(paged.print = TRUE)
+knitr::opts_chunk$set(fig.dim = c(3, 3))
+```
+
+```{r}
+tolerance <- read.table("https://stats.idre.ucla.edu/wp-content/uploads/2016/02/tolerance1.txt", sep = ",", header = T)
+
+print(tolerance)
+```
+
+```{r}
+tolerance.pp <- read.table("https://stats.idre.ucla.edu/wp-content/uploads/2016/02/tolerance1_pp.txt", sep = ",", header = T)
+
+attach(tolerance.pp)
+
+print(tolerance.pp[c(1:9, 76:80), ])
+```
+
+```{r}
+cor(tolerance[, 2:6])
+```
+
+```{r, fig.width=3, fig.height=3}
+library(lattice) # load lattice library for xyplot function
+
+xyplot(tolerance ~ age | id, data = tolerance.pp, as.table = T, layout = c(4, 4))
+```
+
+```{r, fig.width=3, fig.height=3, warning=FALSE}
+xyplot(tolerance ~ age | id,
+  data = tolerance.pp,
+  prepanel = function(x, y) prepanel.loess(x, y, family = "gaussian"),
+  xlab = "Age", ylab = "Tolerance",
+  panel = function(x, y) {
+    panel.xyplot(x, y)
+    panel.loess(x, y, family = "gaussian")
+  },
+  ylim = c(0, 4),
+  as.table = T,
+  layout = c(4, 4)
+)
+```
+
+```{r}
+res <- by(tolerance.pp, id, function(x) summary(lm(tolerance ~ time, data = x)))
+res[1:2]
+```
+
+```{r}
+int <- by(tolerance.pp, id, function(data) {
+  coefficients(lm(tolerance ~ time, data = data))[[1]]
+})
+int <- unlist(int)
+names(int) <- NULL
+summary(int)
+stem(int, scale = 2)
+```
+
+```{r}
+# stem plot for fitted rate of change
+rate <- by(tolerance.pp, id, function(data) {
+  coefficients(lm(tolerance ~ time, data = data))[[2]]
+})
+rate <- unlist(rate)
+names(rate) <- NULL
+summary(rate)
+stem(rate, scale = 2)
+```
+
+```{r}
+# stem plot for R sq
+rsq <- by(tolerance.pp, id, function(data) {
+  summary(lm(tolerance ~ time, data = data))$r.squared
+})
+rsq <- unlist(rsq)
+names(rsq) <- NULL
+summary(rsq)
+stem(rsq, scale = 2)
+```
+
+```{r, fig.width=3, fig.height=3}
+xyplot(tolerance ~ age | id,
+  data = tolerance.pp,
+  panel = function(x, y) {
+    panel.xyplot(x, y)
+    panel.lmline(x, y)
+  }, ylim = c(0, 4), as.table = T,
+  layout = c(4, 4)
+)
+```
+
+```{r, fig.width=3, fig.height=3}
+interaction.plot(tolerance.pp$age, tolerance.pp$id, tolerance.pp$tolerance)
+```
+
+```{r, fig.width=3, fig.height=3}
+# fitting the linear model by id
+fit <- by(tolerance.pp, id, function(bydata) fitted.values(lm(tolerance ~ time, data = bydata)))
+fit <- unlist(fit)
+
+# plotting the linear fit by id
+interaction.plot(age, id, fit, xlab = "age", ylab = "tolerance")
+```
+
+```{r}
+# obtaining the intercepts from linear model by id
+ints <- by(
+  tolerance.pp, tolerance.pp$id,
+  function(data) coefficients(lm(tolerance ~ time, data = data))[[1]]
+)
+ints1 <- unlist(ints)
+names(ints1) <- NULL
+c(mean = mean(ints1))
+c(sd = sqrt(var(ints1)))
+```
+
+```{r}
+slopes <- by(
+  tolerance.pp, tolerance.pp$id,
+  function(data) coefficients(lm(tolerance ~ time, data = data))[[2]]
+)
+slopes1 <- unlist(slopes)
+names(slopes1) <- NULL
+c(mean = mean(slopes1))
+c(sd = sqrt(var(slopes1)))
+c(cor = cor(ints1, slopes1))
+
+```
+
+```{r, fig.width=3, fig.height=3}
+# fitting the linear model by id, males only
+tolm <- tolerance.pp[male == 1 , ]
+fitmlist <- by(tolm, tolm$id, function(bydata) fitted.values(lm(tolerance ~ time, data=bydata))) 
+fitm <- unlist(fitmlist)
+
+#appending the average for the whole group
+lm.m <- fitted( lm(tolerance ~ time, data=tolm) )
+names(lm.m) <- NULL
+fit.m2 <- c(fitm, lm.m[1:5])
+age.m <- c(tolm$age, seq(11,15))
+id.m <- c(tolm$id, rep(111, 5))
+
+#plotting the linear fit by id, males
+#id.m=111 denotes the average value for males
+interaction.plot(age.m, id.m, fit.m2, ylim=c(0, 4), xlab="AGE", ylab="TOLERANCE", lwd=1)
+title(main="Males")
+```
+
+```{r, fig.width=3, fig.height=3}
+#fitting the linear model by id, females only
+tol.pp.fm <- tolerance.pp[tolerance.pp$male == 0, ]
+fit.fm <- by(tol.pp.fm, tol.pp.fm$id, 
+          function(data) fitted.values(lm(tolerance ~ time, data=data))) 
+fit.fm1 <- unlist(fit.fm)
+names(fit.fm1) <- NULL
+
+#appending the average for the whole group
+lm.fm <- fitted( lm(tolerance ~ time, data=tol.pp.fm) )
+names(lm.fm) <- NULL
+fit.fm2 <- c(fit.fm1, lm.fm[1:5])
+age.fm <- c(tol.pp.fm$age, seq(11,15))
+id.fm <- c(tol.pp.fm$id, rep(1111, 5))
+
+#plotting the linear fit by id, females
+#id.fm=1111 denotes the average for females
+interaction.plot(age.fm, id.fm, fit.fm2, ylim=c(0, 4), xlab="AGE", ylab="TOLERANCE", lwd=1)
+title(main="Females")
+```
+
+```{r, fig.width=6, fig.height=3}
+#windows.options(width = 12, height = 5)
+par(mfrow = c(1, 2), mar = c(4, 4, 2, 1))
+interaction.plot(age.m, id.m, fit.m2, ylim=c(0, 4), xlab="AGE", ylab="TOLERANCE", lwd=1) 
+title(main="Males")
+interaction.plot(age.fm, id.fm, fit.fm2, ylim=c(0, 4), xlab="AGE", ylab="TOLERANCE", lwd=1) 
+title(main="Females")
+```
+
+```{r, fig.width=3, fig.height=3}
+#fitting the linear model by id, low exposure
+tol.pp.low <- tolerance.pp[tolerance.pp$exposure < 1.145 , ]
+fit.low <- by(tol.pp.low, tol.pp.low$id, 
+          function(data) fitted.values(lm(tolerance ~ time, data=data))) 
+fit.low1 <- unlist(fit.low)
+names(fit.low1) <- NULL
+
+#appending the average for the whole group
+lm.low <- fitted( lm(tolerance ~ time, data=tol.pp.low) )
+names(lm.low) <- NULL
+fit.low2 <- c(fit.low1, lm.low[1:5])
+age.low <- c(tol.pp.low$age, seq(11,15))
+id.low <- c(tol.pp.low$id, rep(1, 5))
+
+#plotting the linear fit by id, low Exposure
+#id.low=1 denotes the average for group
+interaction.plot(age.low, id.low, fit.low2, ylim=c(0, 4), xlab="AGE", ylab="TOLERANCE", lwd=1)
+title(main="Low Exposure")
+```
+
+```{r, fig.width=3, fig.height=3}
+#fitting the linear model by id, high exposure
+tol.pp.hi <- tolerance.pp[tolerance.pp$exposure >= 1.145 , ]
+fit.hi <- by(tol.pp.hi, tol.pp.hi$id, 
+          function(data) fitted.values(lm(tolerance ~ time, data=data))) 
+fit.hi1 <- unlist(fit.hi)
+names(fit.hi1) <- NULL
+
+#appending the average for the whole group
+lm.hi <- fitted( lm(tolerance ~ time, data=tol.pp.hi) )
+names(lm.hi) <- NULL
+fit.hi2 <- c(fit.hi1, lm.hi[1:5])
+age.hi <- c(tol.pp.hi$age, seq(11,15))
+id.hi <- c(tol.pp.hi$id, rep(1, 5))
+
+#plotting the linear fit by id, High Exposure
+#id.hi=1 denotes the average for group
+interaction.plot(age.hi, id.hi, fit.hi2, ylim=c(0, 4), xlab="AGE", ylab="TOLERANCE", lwd=1)
+title(main="High Exposure")
+```
+
+```{r}
+plot(tolerance$male, ints1, xlab="Male", ylab="Fitted initial status", 
+     xlim=c(0, 1), ylim=c(0.5, 2.5))
+```
+
+```{r}
+cor(tolerance$male, ints1)
+```
+
+```{r}
+plot(tolerance$exposure, ints1, xlab="Exposure", ylab="Fitted initial status", 
+     xlim=c(0, 2.5), ylim=c(0.5, 2.5))
+```
+
+```{r}
+cor(tolerance$exposure, ints1)
+```
+
+```{r}
+plot(tolerance$male, slopes1, xlab="Male", ylab="Fitted rate of change", 
+     xlim=c(0, 1), ylim=c(-0.4, .8))
+```
+
+```{r}
+cor(tolerance$male, slopes1)
+```
+
+```{r}
+plot(tolerance$exposure, slopes1, xlab = "Exposure", ylab = 
+	"Fitted rate of change", xlim = c(0, 2.5), ylim = c(-0.2, 0.8))
+```
+
+```{r}
+cor(tolerance$exposure, slopes1)
+```

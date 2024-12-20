@@ -1,0 +1,226 @@
+---
+title: "note16"
+output: html_notebook
+always_allow_html: true
+---
+
+# 16 R 마크다운 및 퍼블리싱
+
+## 16.1 새 문서 만들기
+
+## 16.2 제목, 저자 또는 날짜 추가
+
+```{r}
+# ---
+# title: "Your Title Here"
+# author: "Your Name Here"
+# date: "12/31/9999"
+# output: html_document
+# ---
+```
+
+## 16.3 문서 텍스트 서식 지정
+
+*italics*
+
+**bold**
+
+`code`
+
+sub~script~
+
+super^script^
+
+a-b dash
+
+-- endash
+
+--- emdash
+
+## 16.4 문서 제목 삽입
+
+```{r}
+# Level 1 Heading
+## Level 2 Heading
+### Level 3 Heading
+#### Level 4 Heading
+##### Level 5 Heading
+###### Level 6 Heading
+```
+
+## 16.5 목록 삽입
+
+-   first item
+-   second item
+-   third item
+
+1.  first item
+2.  second item
+3.  third item
+
+-   first item
+    -   first subitem
+    -   second subitem
+    -   third subitem
+-   second item
+
+1.  first item
+2.  second item
+    a.  abc
+    b.  def
+        i.  this
+        ii. is the last
+    c.  sd
+3.  test
+
+## 16.6 R 코드의 출력 보기
+
+The square root of pi is `r sqrt(pi)`.
+
+```{r}
+sqrt(pi)
+sqrt(1:5)
+```
+
+## 16.7 어떤 코드와 결과를 보여줄지 제어하기
+
+```{r}
+
+```
+
+## 16.8 플롯 삽입
+
+```{r}
+library(ggplot2)
+gg <- ggplot(airquality, aes(Wind, Temp)) +
+  geom_point()
+print(gg)
+```
+
+```{r out.width='30%'}
+print(gg)
+```
+
+```{r out.width='50%', out.height='20%', fig.cap='Temperature versus wind speed', fig.align='left'}
+print(gg)
+```
+
+## 16.9 테이블 삽입
+
+| Stooge | Year | Hair?           |
+|--------|------|-----------------|
+| Moe    | 1887 | Yes             |
+| Larry  | 1902 | Yes             |
+| Curly  | 1903 | No (ironically) |
+
+| Left  | Right | Center | Default |
+|:------|------:|:------:|---------|
+| 12345 | 12345 | 12345  | 12345   |
+| text  |  text |  text  | text    |
+| 12    |    12 |   12   | 12      |
+
+## 16.10 데이터 테이블 삽입
+
+```{r}
+myTable <- data.frame(
+  x = c(1.111, 2.222, 3.333),
+  y = c("one", "two", "three"),
+  z = c(pi, 2 * pi, 3 * pi)
+)
+knitr::kable(myTable, caption = "My Table")
+```
+
+```{r}
+library(knitr)
+library(kableExtra)
+
+kable(myTable, digits = 2, caption = "My Table") %>%
+  kable_styling(
+    full_width = FALSE,
+    latex_options = c("hold_position", "striped"),
+    position = "center",
+    font_size = 12
+  )
+```
+
+```{r}
+flextable::regulartable(myTable)
+```
+
+## 16.11 수학 방정식 삽입하기
+
+This is an example of math equations: $\beta = (X^{T}X)^{-1}X^{T}{\bf{y}}$.
+
+$$
+\frac{\partial \mathrm C}{ \partial \mathrm t } + \frac{1}{2}\sigma^{2} 
+      \mathrm S^{2} \frac{\partial^{2} \mathrm C}{\partial \mathrm C^2}
+    + \mathrm r \mathrm S \frac{\partial \mathrm C}{\partial \mathrm S}\ =
+    \mathrm r \mathrm C
+$$
+
+## 16.12 HTML 출력 생성 하기
+
+## 16.13 PDF 출력 생성 하기
+
+Sometimes you want to write directly in \LaTeX !
+
+## 16.14 마이크로소프트 워드 출력 생성 하기
+
+$$
+M = \begin{bmatrix}
+       \frac{1}{6} & \frac{1}{6} & 0           \\[0.3em]
+       \frac{7}{8} & 0           & \frac{2}{3} \\[0.3em]
+       0           & \frac{7}{9} & \frac{7}{7}
+     \end{bmatrix}
+$$
+
+$( \big( \Big( \bigg( \Bigg($
+
+```{r}
+library(tidyverse)
+mtcars %>%
+  group_by(cyl, gear) %>%
+  summarize(mean_hp = mean(hp)) %>%
+  ggplot(., aes(x = cyl, y = mean_hp, group = gear)) +
+  geom_point() +
+  geom_line(aes(linetype = factor(gear))) +
+  theme_bw()
+```
+
+```{r, dpi=300}
+mtcars %>%
+  group_by(cyl, gear) %>%
+  summarize(mean_hp = mean(hp)) %>%
+  ggplot(., aes(x = cyl, y = mean_hp, group = gear)) +
+  geom_point() +
+  geom_line(aes(linetype = factor(gear))) +
+  theme_bw()
+```
+
+```{r}
+library(knitr)
+myTable <- tibble(
+  x = c(1.111, 2.222, 3.333),
+  y = c("one", "two", "three"),
+  z = c(5, 6, 7)
+)
+kable(myTable, caption = "My Table in Word")
+```
+
+```{r}
+library(flextable)
+regulartable(myTable)
+```
+
+```{r}
+regulartable(myTable) %>%
+  width(width = c(.5, 1.5, 3)) %>%
+  bg(bg = "#000080", part = "header") %>%
+  color(color = "white", part = "header")
+```
+
+## 16.15 프레젠테이션 출력 생성
+
+## 16.16 매개변수화된 보고서 생성
+
+## 16.17 R 마크다운 워크플로 구성하기

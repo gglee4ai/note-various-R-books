@@ -1,0 +1,204 @@
+---
+title: "Chapter 9"
+output: html_notebook
+---
+
+# 9 Debugging, condition handling, and defensive programming
+
+## 9.1 Debugging techniques
+
+## 9.2 Debugging tools
+
+```{r}
+f <- function(a) g(a)
+g <- function(b) h(b)
+h <- function(c) i(c)
+i <- function(d) "a" + d
+try(f(10))
+```
+
+## 9.3 Condition handling
+
+```{r}
+f1 <- function(x) {
+  log(x)
+  10
+}
+try(f1("x"))
+```
+
+```{r}
+f2 <- function(x) {
+  try(log(x))
+  10
+}
+f2("x")
+```
+
+```{r}
+f2 <- function(x) {
+  try(log(x), silent = TRUE)
+  10
+}
+f2("x")
+```
+
+```{r}
+try({
+  a <- 1
+  b <- "x"
+  a + b
+})
+```
+
+```{r}
+success <- try(1 + 2)
+failure <- try("a" + "b")
+class(success)
+class(failure)
+```
+
+```{r}
+elements <- list(1:10, c(-1, 10), c(TRUE, FALSE), letters)
+elements
+```
+
+```{r}
+# results <- lapply(elements, log)
+results <- lapply(elements, function(x) try(log(x)))
+```
+
+```{r}
+is.error <- function(x) inherits(x, "try-error")
+succeeded <- !vapply(results, is.error, logical(1))
+str(results[succeeded])
+```
+
+```{r}
+default <- NULL
+try(default <- read.csv("possible-bad-input.csv"), silent = TRUE)
+default
+```
+
+```{r}
+show_condition <- function(code) {
+  tryCatch(
+    code,
+    error = function(c) "error",
+    warning = function(c) "warning",
+    message = function(c) "message"
+  )
+}
+
+show_condition(stop("!"))
+show_condition(warning("?"))
+show_condition(message("."))
+show_condition(10)
+```
+
+```{r}
+try2 <- function(code, silent = FALSE) {
+  tryCatch(code, error = function(c) {
+    msg <- conditionMessage(c)
+    if (!silent) message(c)
+    invisible(structure(msg, class = "try-error"))
+  })
+}
+try2(1)
+try2(stop("Hi"))
+try2(stop("Hi"), silent = TRUE)
+```
+
+```{r}
+try(read.csv("code/dummy.csv"))
+```
+
+```{r}
+read.csv2 <- function(file, ...) {
+  tryCatch(read.csv(file, ...), error = function(c) {
+    c$message <- paste0(c$message, " (in ", file, ")")
+    stop(c)
+  })
+}
+try(read.csv2("code/dummy.csv"))
+```
+
+```{r}
+# i <- 1
+# while (i < 3) {
+#   tryCatch({
+#     Sys.sleep(0.5)
+#     message("Try to escape")
+#   }, interrupt = function(x) {
+#     message("Try agagin!")
+#     i <<- i + 1
+#   })
+# }
+```
+
+```{r}
+condition <- function(subclass, message, call = sys.call(-1), ...) {
+  structure(
+    class = c(subclass, "condition"),
+    list(message = message, call = call),
+    ...
+  )
+}
+is.condition <- function(x) inherits(x, "condition")
+```
+
+```{r}
+e <- condition(c("my_error", "error"), "This is an error")
+signalCondition(e)
+# NULL
+try(stop(e))
+# Error: This is an error
+w <- condition(c("my_warning", "warning"), "This is a warning")
+warning(w)
+# Warning message: This is a warning
+m <- condition(c("my_message", "message"), "This is a message")
+message(m)
+# This is a message
+```
+
+```{r}
+custom_stop <- function(subclass, message, call = sys.call(-1),
+                        ...) {
+  c <- condition(c(subclass, "error"), message, call = call, ...)
+  stop(c)
+}
+
+my_log <- function(x) {
+  if (!is.numeric(x)) {
+    custom_stop("invalid_class", "my_log() needs numeric input")
+  }
+  if (any(x < 0)) {
+    custom_stop("invalid_value", "my_log() needs positive inputs")
+  }
+
+  log(x)
+}
+tryCatch(
+  my_log("a"),
+  invalid_class = function(c) "class",
+  invalid_value = function(c) "value"
+)
+#> [1] "class"
+```
+
+```{r}
+tryCatch(custom_stop("my_error", "!"),
+  error = function(c) "error",
+  my_error = function(c) "my_error"
+)
+#> [1] "error"
+tryCatch(custom_stop("my_error", "!"),
+  my_error = function(c) "my_error",
+  error = function(c) "error"
+)
+#> [1] "my_error"
+```
+
+## 9.4 Defensive programming
+
+## 9.5 Quiz answers

@@ -1,0 +1,219 @@
+---
+title: "note08"
+output: html_notebook
+---
+
+# 8 확률
+
+## 8.1 조합 수 계산
+
+```{r}
+choose(5, 3)
+choose(50, 3)
+choose(50, 30)
+```
+
+## 8.2 조합 생성
+
+```{r}
+items <- 2:5
+k <- 2
+combn(items, k)
+```
+
+```{r}
+combn(1:5, 3)
+```
+
+```{r}
+combn(c("T1", "T2", "T3", "T4", "T5"), 3)
+```
+
+## 8.3 난수 생성
+
+```{r}
+runif(1)
+runif(10)
+runif(1, min = -3, max = 3)
+```
+
+```{r}
+rnorm(1)
+rnorm(1, mean = 100, sd = 15)
+rbinom(1, size = 10, prob = 0.5)
+rpois(1, lambda = 10)
+rexp(1, rate = 0.1)
+rgamma(1, shape = 2, rate = 0.1)
+```
+
+```{r}
+rnorm(3, mean = c(-10, 0, 10), sd = 1)
+```
+
+```{r}
+means <- rnorm(30, mean = 0, sd = 0.2)
+rnorm(30, mean = means, sd = 1)
+```
+
+## 8.4 재현 가능한 난수 생성
+
+```{r}
+set.seed(42)
+runif(10)
+
+set.seed(165)
+runif(10)
+
+set.seed(42)
+runif(10)
+```
+
+## 8.5 무작위 샘플 생성
+
+```{r}
+sample(1950:2020, 10)
+```
+
+```{r}
+set.seed(42)
+x <- rnorm(1000, 4, 10)
+n <- 1000
+medians <- numeric(n)
+for (i in seq_along(medians)) {
+  medians[i] <- median(sample(x, replace = TRUE))
+}
+mean(medians)
+sd(medians)
+```
+
+```{r}
+ci <- quantile(medians, c(0.025, 0.975))
+cat("95% confidence interval is (", ci, ")\n")
+```
+
+## 8.6 무작위 시퀀스 생성
+
+```{r}
+sample(c("H", "T"), 10, replace = TRUE)
+```
+
+```{r}
+sample(c(FALSE, TRUE), 20, replace = TRUE)
+```
+
+```{r}
+sample(c(FALSE, TRUE), 20, replace = TRUE, prob = c(0.2, 0.8))
+```
+
+```{r}
+rbinom(10, 1, 0.8)
+```
+
+## 8.7 벡터의 무작위 치환
+
+```{r}
+sample(1:10)
+```
+
+## 8.8 이산 분포에 대한 확률 계산
+
+```{r}
+dbinom(7, size = 10, prob = 0.5)
+```
+
+```{r}
+pbinom(5, size = 10, prob = 0.5)
+```
+
+```{r}
+pbinom(7, size = 10, prob = 0.5, lower.tail = FALSE)
+```
+
+```{r}
+pbinom(7, size = 10, prob = 0.5) - pbinom(3, size = 10, prob = 0.5)
+```
+
+```{r}
+pbinom(c(3, 7), size = 10, prob = 0.5)
+```
+
+## 8.9 연속 분포 확률 계산
+
+```{r}
+pnorm(q = .8, mean = 0, sd = 1)
+```
+
+```{r}
+pnorm(66, mean = 70, sd = 3)
+```
+
+```{r}
+pexp(20, rate = 1 / 40)
+pexp(20, rate = 1 / 40, lower.tail = FALSE)
+```
+
+```{r}
+pexp(50, rate = 1 / 40) - pexp(20, rate = 1 / 40)
+```
+
+## 8.10 확률을 분위로 변환하기
+
+```{r}
+qnorm(0.05, mean = 100, sd = 15)
+```
+
+```{r}
+qnorm(c(0.025, 0.975))
+```
+
+## 8.11 밀도 함수 그리기
+
+```{r}
+x <- seq(-3, 3, 0.05)
+y <- dnorm(x)
+plot(x, y, type = "l")
+```
+
+```{r}
+library(ggplot2)
+x <- seq(0, 6, length.out = 100)
+ylim <- c(0, 0.6)
+
+df <- rbind(
+  data.frame(x = x, dist_name = "Uniform", y = dunif(x, min = 2, max = 4)),
+  data.frame(x = x, dist_name = "Normal", y = dnorm(x, mean = 3, sd = 1)),
+  data.frame(x = x, dist_name = "Exponential", y = dexp(x, rate = 1 / 2)),
+  data.frame(x = x, dist_name = "Gamma", y = dgamma(x, shape = 2, rate = 1))
+)
+df |>
+  ggplot(aes(x = x, y = y)) +
+  geom_line() +
+  facet_wrap(~dist_name)
+```
+
+```{r}
+x <- seq(-3, 3, length.out = 100)
+df <- data.frame(x = x, y = dnorm(x, mean = 0, sd = 1))
+p <- ggplot(df, aes(x, y)) +
+  geom_line() +
+  labs(
+    title = "Standard Normal Distribution",
+    y = "Density",
+    x = "Quantile"
+  )
+p
+```
+
+```{r}
+q75 <- quantile(df$x, .75)
+q95 <- quantile(df$x, .95)
+p +
+  geom_ribbon(
+    data = subset(df, x > q75 & x < q95),
+    aes(ymax = y),
+    ymin = 0,
+    fill = "blue",
+    color = NA,
+    alpha = 0.5
+  )
+```

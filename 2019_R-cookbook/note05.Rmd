@@ -1,0 +1,705 @@
+---
+title: "note05"
+output: html_notebook
+---
+
+# 5 데이터 구조
+
+```{r}
+v <- c(10, 20, 30)
+names(v) <- c("Moe", "Larry", "Curly")
+v
+```
+
+```{r}
+v[["Larry"]]
+```
+
+```{r}
+mode(factor(c("NY", "CA", "IL")))
+mode(3.1415)
+mode(c(2.7182, 3.1415))
+mode("Moe")
+mode(list("Moe", "Larry", "Curly"))
+```
+
+```{r}
+d <- as.Date("2010-03-15")
+mode(d)
+length(d)
+class(d)
+```
+
+```{r}
+pi
+length(pi)
+pi[1]
+pi[2]
+```
+
+```{r}
+A <- 1:6
+dim(A)
+A
+```
+
+```{r}
+dim(A) <- c(2, 3)
+print(A)
+```
+
+```{r}
+B <- list(1, 2, 3, 4, 5, 6)
+dim(B)
+dim(B) <- c(2, 3)
+B
+```
+
+```{r}
+D <- 1:12
+dim(D) <- c(2, 3, 2)
+D
+```
+
+```{r}
+C <- list(1, 2, 3, "X", "Y", "Z")
+dim(C) <- c(2, 3)
+C
+```
+
+## 5.1 벡터에 데이터 추가하기
+
+```{r}
+v <- c(1, 2, 3)
+newItems <- c(6, 7, 8)
+c(v, newItems)
+```
+
+```{r}
+v[length(v) + 1] <- 42
+v
+```
+
+```{r}
+v <- c(1, 2, 3)
+v <- c(v, 4)
+v
+```
+
+```{r}
+w <- c(5, 6, 7, 8)
+v <- c(v, w)
+v
+```
+
+```{r}
+v <- c(1, 2, 3)
+v[10] <- 10
+v
+```
+
+## 5.2 벡터에 데이터 삽입하기
+
+```{r}
+append(1:10, 99, after = 5)
+```
+
+```{r}
+append(1:10, 99, after = 0)
+```
+
+## 5.3 재활용 규칙의 이해
+
+```{r}
+cbind(1:6, 1:3)
+```
+
+```{r}
+cbind(1:6, 1:5)
+```
+
+```{r}
+(1:6) + 10
+```
+
+## 5.4 요인 생성(범주형 변수)
+
+```{r}
+f <- factor(v)
+f
+```
+
+```{r}
+f <- factor(c("Win", "Win", "Lose", "Tie", "Win", "Lose"))
+f
+```
+
+```{r}
+wday <- c(
+  "Wed", "Thu", "Mon", "Wed", "Thu",
+  "Thu", "Thu", "Tue", "Thu", "Tue"
+)
+f <- factor(wday)
+f
+```
+
+```{r}
+f <- factor(wday, levels = c("Mon", "Tue", "Wed", "Thu", "Fri"))
+f
+```
+
+## 5.5 여러 벡터를 하나의 벡터와 인자로 결합하기
+
+```{r}
+freshmen <- c(1, 2, 1, 1, 5)
+sophomores <- c(3, 2, 3, 3, 5)
+juniors <- c(5, 3, 4, 3, 3)
+comb <- stack(list(fresh = freshmen, soph = sophomores, jrs = juniors))
+comb
+```
+
+```{r}
+aov(values ~ ind, data = comb)
+```
+
+## 5.6 목록 만들기
+
+```{r}
+lst <- list(0.5, 0.841, 0.977)
+lst
+```
+
+```{r}
+lst <- list(3.14, "Moe", c(1, 1, 2, 3), mean)
+lst
+```
+
+```{r}
+lst <- list()
+lst[[1]] <- 3.14
+lst[[2]] <- "Moe"
+lst[[3]] <- c(1, 1, 2, 3)
+lst[[4]] <- mean
+lst
+```
+
+```{r}
+lst <- list(mid = 0.5, right = 0.841, far.right = 0.977)
+lst
+```
+
+## 5.7 위치별 목록 요소 선택
+
+```{r}
+years <- list(1960, 1964, 1976, 1994)
+years
+```
+
+```{r}
+years[[1]]
+```
+
+```{r}
+years[c(1, 2)]
+```
+
+```{r}
+class(years[[1]])
+class(years[1])
+```
+
+```{r}
+cat(years[[1]], "\n")
+try(cat(years[1], "\n"))
+```
+
+## 5.8 이름으로 목록 요소 선택하기
+
+```{r}
+years <- list(
+  Kennedy = 1960, Johnson = 1964,
+  Carter = 1976, Clinton = 1994
+)
+years[["Kennedy"]]
+years$Kennedy
+```
+
+```{r}
+years[c("Kennedy", "Johnson")]
+years["Carter"]
+```
+
+## 5.9 이름/값 연관 목록 작성
+
+```{r}
+lst <- list(mid = 0.5, right = 0.841, far.right = 0.977)
+lst
+```
+
+```{r}
+values <- c(1, 2, 3)
+names <- c("a", "b", "c")
+lst <- list()
+lst[names] <- values
+lst
+```
+
+```{r}
+lst <- list(
+  far.left = 0.023,
+  left = 0.159,
+  mid = 0.500,
+  right = 0.841,
+  far.right = 0.977
+)
+lst
+```
+
+```{r}
+lst <- list()
+lst$far.left <- 0.023
+lst$left <- 0.159
+lst$mid <- 0.500
+lst$right <- 0.841
+lst$far.right <- 0.977
+```
+
+```{r}
+values <- -2:2
+names <- c("far.left", "left", "mid", "right", "far.right")
+lst <- list()
+lst[names] <- values
+lst
+```
+
+```{r}
+cat("The left limit is", lst[["left"]], "\n")
+cat("The right limit is", lst[["right"]], "\n")
+```
+
+```{r}
+for (nm in names(lst)) cat("The", nm, "limit is", lst[[nm]], "\n")
+```
+
+## 5.10 목록에서 요소 제거하기
+
+```{r}
+years <- list(
+  Kennedy = 1960, Johnson = 1964,
+  Carter = 1976, Clinton = 1994
+)
+years
+```
+
+```{r}
+years[["Johnson"]] <- NULL # Remove the element labeled "Johnson"
+years
+```
+
+```{r}
+years[c("Carter", "Clinton")] <- NULL # Remove two elements
+years
+```
+
+## 5.11 목록을 벡터로 병합하기
+
+```{r}
+iq.scores <- list(100, 120, 103, 80, 99)
+mean(unlist(iq.scores))
+```
+
+```{r}
+# cat(iq.scores, "\n")
+cat("IQ Scores:", unlist(iq.scores), "\n")
+```
+
+## 5.12 목록에서 NULL 요소 제거
+
+```{r}
+library(purrr) # or library(tidyverse)
+
+lst <- list("Moe", NULL, "Curly")
+lst
+```
+
+```{r}
+compact(lst) # Remove NULL element
+```
+
+## 5.13 조건을 사용하여 목록 요소 제거하기
+
+```{r}
+lst <- list(NA, 0, NA, 1, 2)
+lst |> discard(is.na)
+```
+
+```{r}
+lst <- list(3, "dog", 2, "cat", 1)
+
+lst %>%
+  discard(is.character)
+```
+
+```{r}
+is_na_or_null <- function(x) {
+  is.na(x) || is.null(x)
+}
+
+lst <- list(1, NA, 2, NULL, 3)
+
+lst %>%
+  discard(is_na_or_null)
+```
+
+```{r}
+x <- rnorm(10)
+y1 <- 10 * x + rnorm(10)
+y2 <- rnorm(10)
+y3 <- rnorm(10)
+mods <- list(
+  lm(x ~ y1),
+  lm(x ~ y2),
+  lm(x ~ y3)
+)
+
+filter_r2 <- function(model) {
+  summary(model)$r.squared < 0.7
+}
+
+mods %>%
+  discard(filter_r2)
+```
+
+## 5.14 행렬 초기화
+
+```{r}
+vec <- 1:6
+matrix(vec, 2, 3)
+```
+
+```{r}
+matrix(0, 2, 3) # Create an all-zeros matrix
+```
+
+```{r}
+matrix(NA, 2, 3)
+```
+
+```{r}
+mat <- matrix(c(1.1, 1.2, 1.3, 2.1, 2.2, 2.3), 2, 3)
+mat
+```
+
+```{r}
+theData <- c(
+  1.1, 1.2, 1.3,
+  2.1, 2.2, 2.3
+)
+mat <- matrix(theData, 2, 3, byrow = TRUE)
+mat
+```
+
+```{r}
+mat <- matrix(c(
+  1.1, 1.2, 1.3,
+  2.1, 2.2, 2.3
+),
+2, 3,
+byrow = TRUE
+)
+mat
+```
+
+```{r}
+v <- c(1.1, 1.2, 1.3, 2.1, 2.2, 2.3)
+dim(v) <- c(2, 3)
+v
+```
+
+## 5.15 행렬 연산 수행
+
+```{r}
+x <- matrix(1:4, 2, 2)
+t(x)
+solve(x)
+x %*% x
+diag(4)
+```
+
+## 5.16 행렬의 행과 열에 설명적인 이름 지정
+
+```{r}
+corr_mat <- matrix(c(
+  1.000, 0.556, 0.390,
+  0.556, 1.000, 0.444,
+  0.390, 0.444, 1.000
+),
+nrow = 3, byrow = TRUE
+)
+colnames(corr_mat) <- c("AAPL", "MSFT", "GOOG")
+rownames(corr_mat) <- c("AAPL", "MSFT", "GOOG")
+corr_mat
+```
+
+```{r}
+corr_mat["MSFT", "GOOG"]
+```
+
+## 5.17 행렬에서 하나의 행이나 열 선택하기
+
+```{r}
+corr_mat[1, ]
+corr_mat[, 3]
+```
+
+```{r}
+mat[1, , drop = FALSE]
+mat[, 3, drop = FALSE]
+```
+
+## 5.18 열 데이터에서 데이터 프레임 초기화
+
+```{r}
+pred1 <- 1:5
+pred2 <- c(1.75, 4.01, 2.64, 6.03, 2.78)
+pred3 <- c("AM", "PM", "AM", "PM", "PM")
+resp <- c(13.2, 12.9, 13.9, 14.9, 16.4)
+```
+
+```{r}
+data.frame(pred1, pred2, pred3, resp)
+```
+
+```{r}
+data.frame(p1 = pred1, p2 = pred2, p3 = pred3, r = resp)
+```
+
+```{r}
+tibble::tibble(p1 = pred1, p2 = pred2, p3 = pred3, r = resp)
+```
+
+```{r}
+list.of.vectors <- list(p1 = pred1, p2 = pred2, p3 = pred3, r = resp)
+as.data.frame(list.of.vectors)
+```
+
+```{r}
+tibble::as_tibble(list.of.vectors)
+```
+
+## 5.19 행 데이터에서 데이터 프레임 초기화
+
+```{r}
+r1 <- data.frame(a = 1, b = 2, c = "X")
+r2 <- data.frame(a = 3, b = 4, c = "Y")
+r3 <- data.frame(a = 5, b = 6, c = "Z")
+rbind(r1, r2, r3)
+```
+
+```{r}
+list.of.rows <- list(r1, r2, r3)
+dplyr::bind_rows(list.of.rows)
+```
+
+```{r}
+l1 <- list(a = 1, b = 2, c = "X")
+l2 <- list(a = 3, b = 4, c = "Y")
+l3 <- list(a = 5, b = 6, c = "Z")
+list.of.lists <- list(l1, l2, l3)
+list.of.lists
+```
+
+```{r}
+dplyr::bind_rows(list.of.lists)
+```
+
+```{r}
+data.frame(a = 1, b = 2, c = "a", stringsAsFactors = FALSE)
+```
+
+```{r}
+data.frame(a = 1, b = 2, c = "a")
+```
+
+```{r}
+l1 <- list(a = 1, b = 2, c = "X")
+l2 <- list(a = 3, b = 4, c = "Y")
+l3 <- list(a = 5, b = 6, c = "Z")
+obs <- list(l1, l2, l3)
+df <- do.call(rbind, Map(as.data.frame, obs))
+df
+```
+
+```{r}
+do.call(rbind, Map(as.data.frame, obs))
+```
+
+```{r}
+i <- sapply(df, is.factor)
+df[i] <- lapply(df[i], as.character)
+df
+```
+
+## 5.20 데이터 프레임에 행 추가
+
+```{r}
+cars
+new_row <- data.frame(speed = 20, dist = 20)
+rbind(cars, new_row)
+```
+
+```{r}
+rbind(
+  cars,
+  data.frame(speed = 22, dist = 22)
+)
+```
+
+## 5.21 위치별 데이터 프레임 열 선택
+
+```{r}
+library(dplyr)
+mtcars %>%
+  select(1)
+```
+
+```{r}
+mtcars %>%
+  select(1, 3, 4)
+```
+
+```{r}
+mtcars %>%
+  select(2:4)
+```
+
+```{r}
+mtcars[1]
+```
+
+```{r}
+mtcars[c(1, 3)]
+```
+
+```{r}
+mtcars[, 1]
+```
+
+```{r}
+mtcars[, c(1, 3)]
+```
+
+## 5.22 이름으로 데이터 프레임 열 선택하기
+
+## 5.23 데이터 프레임 열의 이름 변경
+
+```{r}
+df <- data.frame(V1 = 1:3, V2 = 4:6, V3 = 7:9)
+df %>%
+  rename(tom = V1, dick = V2)
+```
+
+```{r}
+colnames(df) <- c("tom", "dick", "V2")
+```
+
+```{r}
+df <- data.frame(V1 = 1:3, V2 = 4:6, V3 = 7:9)
+df %>% select(tom = V1, V2)
+```
+
+## 5.24 데이터 프레임에서 NA 제거하기
+
+```{r}
+df <- data.frame(
+  x = c(1, NA, 3, 4, 5),
+  y = c(1, 2, NA, 4, 5)
+)
+na.omit(df)
+```
+
+## 5.25 이름으로 열 제외하기
+
+```{r}
+mtcars %>%
+  select(-(mpg:hp))
+```
+
+## 5.26 두 데이터 프레임 결합
+
+```{r}
+df1 <- data.frame(a = c(1, 2))
+df2 <- data.frame(b = c(7, 8))
+
+cbind(df1, df2)
+```
+
+```{r}
+df1 <- data.frame(x = c("a", "a"), y = c(5, 6))
+df2 <- data.frame(x = c("b", "b"), y = c(9, 10))
+rbind(df1, df2)
+```
+
+## 5.27 공통 열로 데이터 프레임 병합하기
+
+```{r}
+born <- tibble(
+  name = c("Moe", "Larry", "Curly", "Harry"),
+  year.born = c(1887, 1902, 1903, 1964),
+  place.born = c("Bensonhurst", "Philadelphia", "Brooklyn", "Moscow")
+)
+
+died <- tibble(
+  name = c("Curly", "Moe", "Larry"),
+  year.died = c(1952, 1975, 1975)
+)
+```
+
+```{r}
+inner_join(born, died, by = "name")
+```
+
+```{r}
+full_join(born, died, by = "name")
+```
+
+```{r}
+full_join(born, died)
+```
+
+```{r}
+df1 <- data.frame(key1 = 1:3, value = 2)
+df2 <- data.frame(key2 = 1:3, value = 3)
+```
+
+```{r}
+inner_join(df1, df2, by = c("key1" = "key2"))
+```
+
+## 5.28 하나의 원자 값을 다른 원자 값으로 변환
+
+```{r}
+as.numeric(" 3.14 ")
+as.integer(3.14)
+as.numeric("foo")
+as.character(101)
+```
+
+```{r}
+as.numeric(c("1", "2.718", "7.389", "20.086"))
+as.numeric(c("1", "2.718", "7.389", "20.086", "etc."))
+as.character(101:105)
+```
+
+```{r}
+as.numeric(FALSE)
+as.numeric(TRUE)
+```
+
+```{r}
+logvec <- c(TRUE, FALSE, TRUE, TRUE, TRUE, FALSE)
+sum(logvec)
+length(logvec) - sum(logvec)
+```
+
+## 5.29 하나의 구조화된 데이터 유형을 다른 유형으로 변환

@@ -1,3 +1,0 @@
-structure(c(0.30610001125808, 1.80459147441167, 0.294478654066348, 
-0.980553115556651), dim = c(1L, 4L), dimnames = list("bobyqa", 
-    c("Bi", "Bw", "escaled", "kscaled")))

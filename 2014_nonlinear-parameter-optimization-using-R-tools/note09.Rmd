@@ -1,0 +1,116 @@
+---
+title: "Chapter 9"
+output: html_notebook
+---
+
+# 9 Add-in function minimization packages for R
+
+## 9.1 Package optimx
+
+### 9.1.2 Example use of optimx()
+
+```{r}
+## ----label=C09rb, echo=TRUE----------------------------------------------
+require(optimx)
+fr <- function(x) { ## Rosenbrock Banana function
+  x1 <- x[1]
+  x2 <- x[2]
+  100 * (x2 - x1 * x1)^2 + (1 - x1)^2
+}
+frg <- function(x) { ## Rosenbrock Banana function gradient
+  x1 <- x[1]
+  x2 <- x[2]
+  g1 <- -400 * (x2 - x1 * x1) * x1 - 2 * (1 - x1)
+  g2 <- 200 * (x2 - x1 * x1)
+  gg <- c(g1, g2)
+}
+sstart <- c(-1.2, 1)
+arb <- optimx(par = sstart, fn = fr, gr = frg, control = list(all.methods = TRUE))
+print(summary(arb, order = value))
+```
+
+```{r}
+# install.packages("nloptr")
+require(nloptr)
+```
+
+```{r}
+nowp <- function(answer) {
+  # nloptwrap answer summary
+  cat("Fn =", answer$value, " after ", answer$iter, " iterations, parameters:\n")
+  print(answer$par)
+  cat(answer$message, "\n")
+  invisible(0)
+}
+
+
+albfgs <- lbfgs(sstart, fr, gr = frg)
+albfgs # nowp(albfgs)
+```
+
+```{r}
+atnewton <- tnewton(sstart, fr, gr = frg)
+atnewton # nowp(atnewton)
+```
+
+```{r}
+avarmetric <- varmetric(sstart, fr, gr = frg)
+avarmetric # nowp(avarmetric)
+```
+
+```{r}
+anelmead <- neldermead(sstart, fr)
+anelmead # nowp(anelmead)
+```
+
+```{r}
+anelmead <- neldermead(sstart, fr)
+anelmead # nowp(anelmead)
+```
+
+```{r}
+anewuoa <- newuoa(sstart, fr)
+anewuoa # nowp(anewuoa)
+```
+
+### 9.2.2 trust and trustOptim
+
+```{r}
+## ----label=C09rbtrust, echo=TRUE, cache=TRUE-----------------------------
+frh <- function(x) { ## Rosenbrock Banana function gradient
+  x1 <- x[1]
+  x2 <- x[2]
+  h11 <- -400 * x2 + 1200 * x1 * x1 + 2
+  h12 <- -400 * x1
+  h21 <- h12
+  h22 <- 200
+  HH <- matrix(c(h11, h12, h21, h22), nrow = 2, ncol = 2)
+}
+objfun1 <- function(x) {
+  val <- fr(x)
+  gg <- frg(x)
+  HH <- frh(x)
+  list(value = val, gradient = gg, hessian = HH)
+}
+objfun2 <- function(x) {
+  stopifnot(is.numeric(x))
+  stopifnot(length(x) == 2)
+  f <- expression(100 * (x2 - x1^2)^2 + (1 - x1)^2)
+  g1 <- D(f, "x1")
+  g2 <- D(f, "x2")
+  h11 <- D(g1, "x1")
+  h12 <- D(g1, "x2")
+  h22 <- D(g2, "x2")
+  x1 <- x[1]
+  x2 <- x[2]
+  f <- eval(f)
+  g <- c(eval(g1), eval(g2))
+  B <- rbind(c(eval(h11), eval(h12)), c(eval(h12), eval(h22)))
+  list(value = f, gradient = g, hessian = B)
+}
+require(trust)
+atrust1 <- trust(objfun1, sstart, rinit = 1, rmax = 5)
+atrust1
+## Get same answers from
+## atrust2<-trust(objfun2, sstart, rinit=1, rmax=5)
+```

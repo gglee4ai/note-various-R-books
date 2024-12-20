@@ -1,0 +1,404 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+options(paged.print = FALSE)
+library(doMC)
+registerDoMC(cores = 8)
+```
+
+# 12 모델 튜닝과 과적합의 위험
+
+## 12.3 무엇을 최적화합니까?
+
+```{r}
+library(tidymodels)
+tidymodels_prefer()
+```
+
+```{r}
+data(two_class_dat)
+set.seed(91)
+split <- initial_split(two_class_dat)
+training_set <- training(split)
+testing_set <- testing(split)
+data_grid <- crossing(A = seq(0.4, 4, length = 200), B = seq(.14, 3.9, length = 200))
+```
+
+```{r}
+training_set %>%
+  ggplot(aes(A, B, color = Class, pch = Class)) +
+  geom_point() +
+  coord_equal() +
+  labs(x = "Predictor A", y = "Predictor B", color = NULL, pch = NULL) +
+  scale_color_manual(values = c("#CC6677", "#88CCEE"))
+```
+
+```{r}
+llhood <- function(...) {
+  logistic_reg() %>%
+    set_engine("glm", ...) %>%
+    fit(Class ~ ., data = training_set) %>%
+    glance() %>%
+    select(logLik)
+}
+
+bind_rows(
+  llhood(),
+  llhood(family = binomial(link = "probit")),
+  llhood(family = binomial(link = "cloglog"))
+) %>%
+  mutate(link = c("logit", "probit", "c-log-log")) %>%
+  arrange(desc(logLik))
+```
+
+```{r}
+set.seed(1201)
+rs <- vfold_cv(training_set, repeats = 10)
+
+lloss <- function(...) {
+  perf_meas <- metric_set(roc_auc, mn_log_loss)
+
+  logistic_reg() %>%
+    set_engine("glm", ...) %>%
+    fit_resamples(Class ~ A + B, rs, metrics = perf_meas) %>%
+    collect_metrics(summarize = FALSE) %>%
+    select(id, id2, .metric, .estimate)
+}
+
+resampled_res <-
+  bind_rows(
+    lloss() %>% mutate(model = "logistic"),
+    lloss(family = binomial(link = "probit")) %>% mutate(model = "probit"),
+    lloss(family = binomial(link = "cloglog")) %>% mutate(model = "c-log-log")
+  ) %>%
+  # Convert log-loss to log-likelihood:
+  mutate(.estimate = ifelse(.metric == "mn_log_loss", -.estimate, .estimate)) %>%
+  group_by(model, .metric) %>%
+  summarize(
+    mean = mean(.estimate, na.rm = TRUE),
+    std_err = sd(.estimate, na.rm = TRUE) / sum(!is.na(.estimate)),
+    .groups = "drop"
+  )
+```
+
+```{r}
+resampled_res %>%
+  filter(.metric == "mn_log_loss") %>%
+  ggplot(aes(mean, model)) +
+  geom_point() +
+  geom_errorbar(
+    aes(
+      xmin = mean - 1.64 * std_err,
+      xmax = mean + 1.64 * std_err
+    ),
+    width = .1
+  ) +
+  labs(y = NULL, x = "log-likelihood")
+```
+
+```{r}
+resampled_res %>%
+  filter(.metric == "roc_auc") %>%
+  ggplot(aes(mean, model)) +
+  geom_point() +
+  geom_errorbar(
+    aes(
+      xmin = mean - 1.64 * std_err,
+      xmax = mean + 1.64 * std_err
+    ),
+    width = .1
+  ) +
+  labs(y = NULL, x = "log-likelihood")
+```
+
+```{r}
+logit_pred <-
+  logistic_reg() %>%
+  set_engine("glm") %>%
+  fit(Class ~ A + B, data = training_set) %>%
+  predict(data_grid, type = "prob") %>%
+  bind_cols(data_grid) %>%
+  mutate(link = "logit")
+probit_pred <-
+  logistic_reg() %>%
+  set_engine("glm", family = binomial(link = "probit")) %>%
+  fit(Class ~ A + B, data = training_set) %>%
+  predict(data_grid, type = "prob") %>%
+  bind_cols(data_grid) %>%
+  mutate(link = "probit")
+cloglog_pred <-
+  logistic_reg() %>%
+  set_engine("glm", family = binomial(link = "cloglog")) %>%
+  fit(Class ~ A + B, data = training_set) %>%
+  predict(data_grid, type = "prob") %>%
+  bind_cols(data_grid) %>%
+  mutate(link = "c-log-log")
+link_grids <-
+  bind_rows(logit_pred, probit_pred, cloglog_pred) %>%
+  mutate(link = factor(link, levels = c("logit", "probit", "c-log-log")))
+link_grids %>%
+  ggplot(aes(x = A, y = B)) +
+  geom_point(
+    data = testing_set, aes(color = Class, pch = Class),
+    alpha = 0.7, show.legend = FALSE
+  ) +
+  geom_contour(aes(z = .pred_Class1, lty = link), breaks = 0.5, color = "black") +
+  scale_color_manual(values = c("#CC6677", "#88CCEE")) +
+  coord_equal() +
+  labs(x = "Predictor A", y = "Predictor B")
+```
+
+## 12.4 잘못된 매개변수 추정의 결과
+
+```{r}
+two_class_rec <-
+  recipe(Class ~ ., data = two_class_dat) %>%
+  step_normalize(all_numeric_predictors())
+
+mlp_mod <-
+  mlp(hidden_units = tune(), epochs = 1000) %>%
+  set_engine("nnet") %>%
+  set_mode("classification")
+
+mlp_wflow <-
+  workflow() %>%
+  add_recipe(two_class_rec) %>%
+  add_model(mlp_mod)
+
+mlp_res <-
+  tibble(
+    hidden_units = 1:20,
+    train = NA_real_,
+    test = NA_real_,
+    model = vector(mode = "list", length = 20)
+  )
+
+for (i in 1:nrow(mlp_res)) {
+  set.seed(27)
+  tmp_mod <-
+    mlp_wflow %>%
+    finalize_workflow(mlp_res %>% slice(i) %>% select(hidden_units)) %>%
+    fit(training_set)
+  mlp_res$train[i] <-
+    roc_auc_vec(training_set$Class, predict(tmp_mod, training_set, type = "prob")$.pred_Class1)
+  mlp_res$test[i] <-
+    roc_auc_vec(testing_set$Class, predict(tmp_mod, testing_set, type = "prob")$.pred_Class1)
+  mlp_res$model[[i]] <- tmp_mod
+}
+```
+
+```{r}
+# tr_plot <-
+mlp_res %>%
+  slice(c(1, 4, 20)) %>%
+  mutate(
+    probs = map(model, ~ bind_cols(data_grid, predict(.x, data_grid, type = "prob")))
+  ) %>%
+  dplyr::select(hidden_units, probs) %>%
+  unnest(cols = c(probs)) %>%
+  mutate(
+    label = paste(format(hidden_units), "units"),
+    label = ifelse(label == " 1 units", " 1 unit", label)
+  ) %>%
+  ggplot(aes(x = A, y = B)) +
+  geom_point(
+    data = training_set, aes(color = Class, pch = Class),
+    alpha = 0.5, show.legend = FALSE
+  ) +
+  geom_contour(aes(z = .pred_Class1), breaks = 0.5, color = "black") +
+  scale_color_manual(values = c("#CC6677", "#88CCEE")) +
+  facet_wrap(~label, nrow = 1) +
+  coord_equal() +
+  ggtitle("Training Set") +
+  labs(x = "Predictor A", y = "Predictor B")
+# tr_plot
+```
+
+```{r}
+# te_plot <-
+mlp_res %>%
+  slice(c(1, 4, 20)) %>%
+  mutate(
+    probs = map(model, ~ bind_cols(data_grid, predict(.x, data_grid, type = "prob")))
+  ) %>%
+  dplyr::select(hidden_units, probs) %>%
+  unnest(cols = c(probs)) %>%
+  mutate(
+    label = paste(format(hidden_units), "units"),
+    label = ifelse(label == " 1 units", " 1 unit", label)
+  ) %>%
+  ggplot(aes(x = A, y = B)) +
+  geom_point(
+    data = testing_set, aes(color = Class, pch = Class),
+    alpha = 0.5, show.legend = FALSE
+  ) +
+  geom_contour(aes(z = .pred_Class1), breaks = 0.5, color = "black") +
+  scale_color_manual(values = c("#CC6677", "#88CCEE")) +
+  facet_wrap(~label, nrow = 1) +
+  coord_equal() +
+  ggtitle("Test Set") +
+  labs(x = "Predictor A", y = "Predictor B")
+# te_plot
+```
+
+## 12.5 최적화를 위한 두 가지 일반적인 전략
+
+```{r}
+load("RData/search_examples.RData", isfar_env <- new.env())
+ls.str(isfar_env)
+```
+
+```{r}
+grid_plot <-
+  ggplot(isfar_env$sfd_grid, aes(x = x, y = y)) +
+  geom_point() +
+  lims(x = 0:1, y = 0:1) +
+  labs(x = "Parameter 1", y = "Parameter 2", title = "Space-Filling Grid") +
+  geom_contour(
+    data = isfar_env$grid_contours,
+    aes(z = obj),
+    alpha = .3,
+    bins = 12
+  ) +
+  coord_equal() +
+  theme_bw() +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+grid_plot
+```
+
+```{r}
+search_plot <-
+  ggplot(isfar_env$nm_res, aes(x = x, y = y)) +
+  geom_point(size = .7) +
+  lims(x = 0:1, y = 0:1) +
+  labs(x = "Parameter 1", y = "Parameter 2", title = "Global Search") +
+  coord_equal() +
+  geom_contour(
+    data = isfar_env$grid_contours,
+    aes(x = x, y = y, z = obj),
+    alpha = .3,
+    bins = 12
+  ) +
+  theme_bw() +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+search_plot
+```
+
+## 12.6 TIDYMODELS의 조정 매개변수
+
+```{r}
+neural_net_spec <-
+  mlp(hidden_units = tune()) %>%
+  set_mode("regression") %>%
+  set_engine("keras")
+neural_net_spec
+```
+
+```{r}
+extract_parameter_set_dials(neural_net_spec)
+```
+
+```{r}
+source("ames_snippets.R")
+```
+
+```{r}
+ames_rec <-
+  recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type +
+    Latitude + Longitude, data = ames_train) %>%
+  step_log(Gr_Liv_Area, base = 10) %>%
+  step_other(Neighborhood, threshold = tune()) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_interact(~ Gr_Liv_Area:starts_with("Bldg_Type_")) %>%
+  step_ns(Longitude, deg_free = tune("longitude df")) %>%
+  step_ns(Latitude, deg_free = tune("latitude df"))
+
+recipes_param <- extract_parameter_set_dials(ames_rec)
+recipes_param
+```
+
+```{r}
+wflow_param <-
+  workflow() %>%
+  add_recipe(ames_rec) %>%
+  add_model(neural_net_spec) %>%
+  extract_parameter_set_dials()
+wflow_param
+```
+
+```{r}
+hidden_units()
+threshold()
+spline_degree()
+```
+
+```{r}
+wflow_param %>% extract_parameter_dials("threshold")
+```
+
+```{r}
+extract_parameter_set_dials(ames_rec) %>%
+  update(threshold = threshold(c(0.8, 1.0)))
+```
+
+```{r}
+rf_spec <-
+  rand_forest(mtry = tune()) %>%
+  set_engine("ranger", regularization.factor = tune("regularization")) %>%
+  set_mode("regression")
+
+rf_param <- extract_parameter_set_dials(rf_spec)
+rf_param
+```
+
+```{r}
+rf_param %>%
+  update(mtry = mtry(c(1, 70)))
+```
+
+```{r}
+pca_rec <-
+  recipe(Sale_Price ~ ., data = ames_train) %>%
+  step_normalize(contains("SF")) %>%
+  step_pca(contains("SF"), threshold = .95)
+
+updated_param <-
+  workflow() %>%
+  add_model(rf_spec) %>%
+  add_recipe(pca_rec) %>%
+  extract_parameter_set_dials() %>%
+  finalize(ames_train)
+
+updated_param %>% extract_parameter_dials("mtry")
+```
+
+```{r}
+rf_param
+```
+
+```{r}
+regularization_factor()
+```
+
+```{r}
+penalty()
+```
+
+```{r}
+penalty(c(-1, 0)) %>%
+  value_sample(1000) %>%
+  summary()
+```
+
+```{r}
+penalty(trans = NULL, range = 10^c(-10, 0))
+```

@@ -1,0 +1,212 @@
+---
+title: "note03"
+output: html_notebook
+---
+
+# 3 예측가의 도구 상자
+
+## 3.1 몇 가지 단순한 예측 기법
+
+```{r}
+library(fpp2)
+library(ggplot2)
+```
+
+```{r}
+beer2 <- ausbeer |> window(start = 1992, end = c(2007, 4))
+autoplot(beer2) +
+  autolayer(meanf(beer2, h = 11), series = "평균", PI = FALSE) +
+  autolayer(naive(beer2, h = 11), series = "단순", PI = FALSE) +
+  autolayer(snaive(beer2, h = 11), series = "계절성 단순", PI = FALSE) +
+  ggtitle("분기별 맥주 생산량 예측값") +
+  xlab("연도") +
+  ylab("단위: 백만 리터") +
+  guides(color = guide_legend(title = "예측"))
+```
+
+```{r}
+goog200 |>
+  autoplot() +
+  autolayer(meanf(goog200, h = 40), series = "평균", PI = FALSE) +
+  autolayer(rwf(goog200, h = 40), series = "나이브", PI = FALSE) +
+  autolayer(rwf(goog200, drift = TRUE, h = 40), series = "표류", PI = FALSE) +
+  ggtitle("구글 주식 (2013년 12월 6일까지)") +
+  xlab("날짜") + ylab("종가(미국 달러)") +
+  guides(colour = guide_legend(title = "예측"))
+```
+
+## 3.2 변환과 조정
+
+```{r}
+dframe <- cbind(Monthly = milk, DailyAverage = milk / monthdays(milk))
+dframe |>
+  `colnames<-`(c("월별", "일별 평균")) |>
+  autoplot(facet = TRUE) +
+  xlab("연도") +
+  ylab("파운드") +
+  ggtitle("젖소별 우유 생산량")
+```
+
+```{r}
+monthdays(milk)
+```
+
+```{r}
+lambda <- BoxCox.lambda(elec)
+lambda
+```
+
+```{r}
+autoplot(BoxCox(elec, lambda))
+```
+
+```{r}
+fc <- eggs |> rwf(drift = TRUE, lambda = 0, h = 50, level = 80)
+fc2 <- eggs |> rwf(drift = TRUE, lambda = 0, h = 50, level = 80, biasadj = TRUE)
+
+autoplot(eggs) +
+  autolayer(fc, series = "단순 역변환") +
+  autolayer(fc2, series = "편향 조정", PI = FALSE)
+```
+
+## 3.3 잔차 진단
+
+```{r}
+goog200 |>
+  autoplot() +
+  xlab("날짜") + ylab("종가(미국 달러)") +
+  ggtitle("구글 주식 일별 가격(2013년 12월 6일까지)")
+```
+
+```{r, paged.print=FALSE}
+res <- goog200 |>
+  naive() |>
+  residuals()
+autoplot(res) +
+  xlab("날짜") + ylab("") +
+  ggtitle("나이브 기법에서 얻은 잔차")
+```
+
+```{r}
+gghistogram(res) + ggtitle("잔차의 히스토그램")
+```
+
+```{r}
+ggAcf(res) + ggtitle("잔차의 ACF")
+```
+
+```{r}
+# lag=h, fitdf=K
+Box.test(res, lag = 10, fitdf = 0)
+```
+
+```{r}
+Box.test(res, lag = 10, fitdf = 0, type = "Lj")
+```
+
+```{r}
+checkresiduals(naive(goog200))
+```
+
+## 3.4 예측 정확도 평가
+
+```{r}
+beer2 <- ausbeer |> window(start = 1992, end = c(2007, 4))
+beerfit1 <- meanf(beer2, h = 10)
+beerfit2 <- rwf(beer2, h = 10)
+beerfit3 <- snaive(beer2, h = 10)
+beerfit4 <- rwf(beer2, h = 10, drift = TRUE)
+autoplot(window(ausbeer, start = 1992)) +
+  autolayer(beerfit1, series = "meanf", PI = FALSE) +
+  autolayer(beerfit2, series = "rwf", PI = FALSE) +
+  autolayer(beerfit3, series = "snaive", PI = FALSE) +
+  autolayer(beerfit4, series = "drift", PI = FALSE)
+```
+
+```{r}
+beer3 <- ausbeer |> window(start = 2008)
+accuracy(beerfit1, beer3)
+accuracy(beerfit2, beer3)
+accuracy(beerfit3, beer3)
+accuracy(beerfit4, beer3)
+```
+
+```{r}
+googfc1 <- goog200 |> meanf(h = 40)
+googfc2 <- goog200 |> rwf(h = 40)
+googfc3 <- goog200 |> rwf(h = 40, drift = TRUE)
+autoplot(subset(goog, end = 240)) +
+  autolayer(googfc1, PI = FALSE, series = "meanf") +
+  autolayer(googfc2, PI = FALSE, series = "rwf") +
+  autolayer(googfc3, PI = FALSE, series = "drift")
+```
+
+```{r}
+googtest <- window(goog, start = 201, end = 240)
+accuracy(googfc1, googtest)
+accuracy(googfc2, googtest)
+accuracy(googfc3, googtest)
+```
+
+```{r}
+goog200
+```
+
+```{r}
+e <- tsCV(goog200, rwf, drift = TRUE, h = 1)
+sqrt(mean(e^2, na.rm = TRUE))
+```
+
+```{r}
+sqrt(mean(residuals(rwf(goog200, drift = TRUE))^2, na.rm = TRUE))
+```
+
+```{r}
+e <-
+  goog200 |>
+  tsCV(forecastfunction = rwf, drift = TRUE, h = 1)
+e^2 |>
+  mean(na.rm = TRUE) |>
+  sqrt()
+```
+
+```{r}
+goog200 |>
+  rwf(drift = TRUE) |>
+  residuals() -> res
+res^2 |>
+  mean(na.rm = TRUE) |>
+  sqrt()
+```
+
+```{r}
+e <- goog200 |> tsCV(forecastfunction = naive, h = 8)
+mse <- colMeans(e^2, na.rm = TRUE)
+data.frame(h = 1:8, MSE = mse) |>
+  ggplot(aes(h, MSE)) +
+  geom_point()
+```
+
+## 3.5 예측 구간
+
+```{r}
+naive(goog200)
+```
+
+```{r}
+autoplot(naive(goog200))
+```
+
+```{r}
+naive(goog200, bootstrap = TRUE)
+```
+
+```{r}
+autoplot(naive(goog200, bootstrap = TRUE))
+```
+
+## 3.6 R의 forecast 패키지
+
+```{r}
+forecast(ausbeer, h = 4)
+```

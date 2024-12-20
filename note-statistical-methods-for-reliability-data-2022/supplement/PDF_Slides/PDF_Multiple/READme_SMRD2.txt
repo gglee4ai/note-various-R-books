@@ -1,1 +1,0 @@
-This folder contains slides six-to-a-page that will save paper if a hard copy is needed.

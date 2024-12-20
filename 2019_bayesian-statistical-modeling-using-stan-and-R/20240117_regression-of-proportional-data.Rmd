@@ -1,0 +1,238 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Tutorial 10.5a - Logistic regression and proportional and percentage data
+
+<https://www.flutterbys.com.au/stats/tut/tut10.5a.html>
+
+# setup
+
+```{r}
+library(ggplot2)
+library(DHARMa)
+library(effects)
+library(lme4)
+```
+
+# data
+
+```{r}
+arrington <- read.csv("data/arrington_full.csv")
+arrington
+```
+
+```{r}
+arrington |>
+  ggplot(aes(Trophic, Empty_perc)) +
+  geom_boxplot()
+```
+
+# arcsin transform
+
+4.4.2: Fit a linear model on arcsin transformed percentage of empty stomachs
+
+```{r}
+arrington.lm1 <- lm(asin(sqrt(Empty_perc)) ~ Trophic, data = arrington)
+summary(arrington.lm1)
+```
+
+```{r}
+plot(arrington.lm1)
+```
+
+```{r}
+boxplot(resid(arrington.lm1) ~ arrington$Trophic)
+```
+
+```{r}
+arrington.sim1 <- simulateResiduals(arrington.lm1)
+plot(arrington.sim1)
+testUniformity(arrington.sim1)
+```
+
+```{r}
+summary(arrington.lm1)
+```
+
+```{r}
+arcsin <- function(x) asin(sqrt(x))
+arcsin.inv <- function(x) sin(x)^2
+```
+
+```{r}
+plot(allEffects(arrington.lm1))
+plot(allEffects(arrington.lm1, transformation = list(link = arcsin, inverse = arcsin.inv)), ylab = "Empty stomachs (proportion)")
+```
+
+# logit transform
+
+4.4.2: Fit a linear model on logit transformed percentage of empty stomachs
+
+Fit a linear model on logit transformed percentage of empty stomachs. Note the logit transform can only be applied to values between 0 and 1 (not 0 or either 1). Therefore, similar to a log+1 transform, if we have zero values, we need to add a small constant to all values. Obviously if there are both 0 and 1 values, it becomes more complex.
+
+```{r}
+min(arrington$Empty_perc[arrington$Empty_perc > 0])
+range(arrington$Empty_perc)
+```
+
+```{r}
+logit <- binomial()$linkfun
+logit.inv <- binomial()$linkinv
+arrington$Perc <- arrington$Empty_perc + min(arrington$Empty_perc[arrington$Empty_perc > 0])
+arrington.lm2 <- lm(logit(Perc) ~ Trophic, data = arrington)
+```
+
+```{r}
+plot(arrington.lm2)
+boxplot(resid(arrington.lm2) ~ arrington$Trophic)
+```
+
+```{r}
+arrington.sim2 <- simulateResiduals(arrington.lm2)
+plot(arrington.sim2)
+testUniformity(arrington.sim2)
+```
+
+```{r}
+summary(arrington.lm2)
+```
+
+```{r}
+plot(allEffects(arrington.lm2))
+plot(allEffects(arrington.lm2, transformation = list(link = logit, inverse = logit.inv)), ylab = "Empty stomachs (proportion)")
+```
+
+# binomial
+
+Rather than transform the raw data in order to satisfy the requirements of linear regression, it is arguably better to fir a model that is more appropriate for the response variable. In this case, since the response is the frequency (proportion) of empty stomachs from a set of fish, we could argue that this is a good match for a binomial distribution. Proportions are bound to the range [0,1] and we might expect a certain degree of relationship between location and scale (mean and variance). The glm() function allows us to work with either proportions or frequencies (the actual counts), so in the following, we will fit the model both ways. These can be considered as identical alternatives.
+
+```{r}
+arrington$NotEmpty <- arrington$Individuals - arrington$Empty
+# arrington.glm <- glm(cbind(Empty, NotEmpty) ~ Trophic, data = arrington, family = binomial)
+arrington.glm <- glm(Empty_perc ~ Trophic, data = arrington, family = binomial, weights = Individuals)
+```
+
+```{r}
+plot(arrington.glm, which = 1:4, ask = FALSE)
+boxplot(resid(arrington.glm) ~ arrington$Trophic)
+```
+
+There are a few major concerns with these diagnostics. Firstly, the Q-Q plot shows severe deviation from linearity suggesting that the data are not a good fit to the nominated distribution (binomial). Secondly, there are numerous Cook's D values that exceed 1, suggesting that observations 90, 180 and 211 are overly influential. As a result, the model estimates and inferences are likely to be biased and unreliable.
+
+```{r}
+## Explore goodness of fit via residuals
+arrington.resid <- sum(resid(arrington.glm, type = "pearson")^2)
+1 - pchisq(arrington.resid, arrington.glm$df.resid)
+### via deviance
+1 - pchisq(arrington.glm$deviance, arrington.glm$df.resid)
+### there is evidence for a lack of fit
+
+## Explore dispersion via residuals
+arrington.resid / arrington.glm$df.resid
+### via deviance
+arrington.glm$deviance / arrington.glm$df.resid
+### overdispersion present (>3)
+```
+
+The model is clearly overdispersed... There are numerous ways of addressing this: compensate for the overdispersion by adopting a quasi distribution such as a quasibinomial. fit a model against a distribution that does not assume dispersion is 1 and has an ability to estimate both location and scale. Such a distribution would be a betaBinomial. Unfortunately, the betaBinomial is not easily implemented in frequentist routines in R. overdispersion is often the result of the model failing to adequately capturing the full variability in the data. Data might be more variable than expected by a model (and its distribution) because of latent effects (additional influences that are not measured or incorporated in the model). If so, then adding a unit (or observation) level random effect (a latent variable) can address overdispersion by soaking up the additional variability. In this relatively simple example, a unit level random effect is simply a variable with the numbers 1 through to the number of rows in the data. Hence, each observation has a unique value (level). In more complex examples, it might be necessary to nest the number sequence within blocks.
+
+# quasibinomial
+
+```{r}
+arrington.glmQP <- glm(cbind(Empty, Individuals - Empty) ~ Trophic, data = arrington, family = quasibinomial)
+plot(arrington.glmQP, which = 1:4, ask = FALSE)
+boxplot(resid(arrington.glmQP) ~ arrington$Trophic)
+```
+
+Since the quasibinomial is not a genuine distribution and its affect is to adjust the standard error there will be no visible effects on the goodness of fit or dispersion estimates. Hence, we cannot explore whether these have been fully addressed.
+
+```{r}
+summary(arrington.glmQP)
+plot(allEffects(arrington.glmQP))
+plot(allEffects(arrington.glmQP, transformation = list(
+  link = logit,
+  inverse = logit.inv
+)), ylab = "Empty stomachs (proportion)")
+```
+
+-   the coefficients are the same between the binomial model (left) and the quasibinomial model (right). The quasibinomial model increases the standard error of estimates proportional to the dispersion parameter - thereby making the tests more conservative.
+-   the quasi model does not provide an AIC as it is not a genuine distribution.
+-   it is not possible to explore simulated residuals from quasi models.
+
+# glmer
+
+```{r}
+arrington$Obs <- factor(1:nrow(arrington))
+arrington.glmer <- glmer(cbind(Empty, NotEmpty) ~ Trophic + (1 | Obs), data = arrington, family = binomial)
+```
+
+```{r}
+par(mfrow = c(1, 2))
+## rather than explore residuals plots, we should plot the random effects against the predicted values
+## from the fixed effect component of the model and check for no trend:
+Xmat <- model.matrix(arrington.glmer)
+fit <- Xmat %*% fixef(arrington.glmer)
+ran <- ranef(arrington.glmer, drop = T)$Obs
+plot(fit, ran)
+## also check for approximate normality of random effects:
+qqnorm(ran)
+qqline(ran)
+```
+
+```{r}
+arrington.sim <- simulateResiduals(arrington.glmer)
+plot(arrington.sim)
+testUniformity(arrington.sim)
+```
+
+```{r}
+arrington.sim <- simulateResiduals(arrington.glmer, refit = T)
+testOverdispersion(arrington.sim)
+testZeroInflation(arrington.sim)
+## no issues here.
+```
+
+```{r}
+summary(arrington.glmer)
+```
+
+```{r}
+exp(fixef(arrington.glmer))
+```
+
+```{r}
+plot(allEffects(arrington.glmer))
+plot(allEffects(arrington.glmer, transformation = list(link = logit, inverse = logit.inv)), ylab = "Empty stomachs (proportion)")
+```
+
+```{r}
+newdata <- data.frame(Trophic = levels(factor(arrington$Trophic)))
+Xmat <- model.matrix(~Trophic, data = newdata)
+coefs <- fixef(arrington.glmer)
+fit <- as.vector(coefs %*% t(Xmat))
+se <- sqrt(diag(Xmat %*% vcov(arrington.glmer) %*% t(Xmat)))
+Q <- qt(0.975, df = nrow(arrington.glmer@frame) - length(coefs) - 2)
+
+newdata <- cbind(newdata, fit = binomial()$linkinv(fit), lower = binomial()$linkinv(fit - Q * se), upper = binomial()$linkinv(fit +
+  Q * se))
+ggplot(newdata, aes(y = fit, x = Trophic)) +
+  # geom_blank() +
+  geom_pointrange(aes(ymin = lower, ymax = upper, x = Trophic)) +
+  scale_y_continuous("Proportion of individuals with empty stomachs") +
+  scale_x_discrete("Trophic Group") +
+  geom_hline(yintercept = 0) #+
+# theme_classic() +
+# theme(
+#   axis.line.x = element_line(),
+#   axis.line.y = element_line(),
+#   axis.title.x = element_text(margin = margin(t = 2, unit = "lines")),
+#   axis.title.y = element_text(margin = margin(r = 2, unit = "lines"))
+# )
+# ylim(0, 1)
+```
+
+# beta regression
+
+# ----

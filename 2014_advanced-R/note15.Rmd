@@ -1,0 +1,419 @@
+---
+title: "Chapter 15"
+output: html_notebook
+---
+
+# 15 Domain specific languages
+
+```{r}
+library(dbplyr)
+translate_sql(sin(x) + tan(y))
+```
+
+```{r}
+translate_sql(x < 5 & !(y >= 5))
+```
+
+```{r}
+translate_sql(first %like% "Had*")
+```
+
+```{r}
+translate_sql(first %in% c("John", "Roger", "Robert"))
+```
+
+```{r}
+translate_sql(like == 7)
+```
+
+## 15.1 HTML
+
+```{r}
+html <- function(x) structure(x, class = "html")
+print.html <- function(x, ...) {
+  out <- paste("<HTML> ", x)
+  cat(paste(strwrap(out), collapse = "\n"), "\n", sep = "")
+}
+```
+
+```{r}
+escape <- function(x) UseMethod("escape")
+escape.html <- function(x) x
+escape.character <- function(x) {
+  x <- gsub("&", "&amp;", x)
+  x <- gsub("<", "&lt;", x)
+  x <- gsub(">", "&gt;", x)
+  html(x)
+}
+escape.list <- function(x) {
+  lapply(x, escape)
+}
+
+escape("This is some text.")
+```
+
+```{r}
+escape("x > 1 & y < 2")
+```
+
+```{r}
+escape(escape("This is some text. 1 > 2"))
+```
+
+```{r}
+escape(html("<hr />"))
+```
+
+```{r}
+names(c(a = 1, b = 2))
+names(c(a = 1, 2))
+names(c(1, 2))
+```
+
+```{r}
+named <- function(x) {
+  if (is.null(names(x))) {
+    return(NULL)
+  }
+  x[names(x) != ""]
+}
+unnamed <- function(x) {
+  if (is.null(names(x))) {
+    return(x)
+  }
+  x[names(x) == ""]
+}
+```
+
+```{r}
+source("R/dsl-html-attributes.R", local = TRUE)
+p <- function(...) {
+  args <- list(...)
+  attribs <- html_attributes(named(args))
+  children <- unlist(escape(unnamed(args)))
+
+  html(paste0(
+    "<p", attribs, ">",
+    paste(children, collapse = ""),
+    "</p>"
+  ))
+}
+
+p("Some text")
+```
+
+```{r}
+p("Some text", id = "myid")
+```
+
+```{r}
+p("Some text", image = NULL)
+```
+
+```{r}
+p("some text", class = "important", "data-value" = 10)
+```
+
+```{r}
+tag <- function(tag) {
+  force(tag)
+  function(...) {
+    args <- list(...)
+    attribs <- html_attributes(named(args))
+    children <- unlist(escape(unnamed(args)))
+
+    html(paste0(
+      "<", tag, attribs, ">",
+      paste(children, collapse = ""),
+      "</", tag, ">"
+    ))
+  }
+}
+```
+
+```{r}
+p <- tag("p")
+b <- tag("b")
+i <- tag("i")
+p("Some text.", b("Some bold text"), i("Some italic text"), class = "mypara")
+```
+
+```{r}
+void_tag <- function(tag) {
+  force(tag)
+  function(...) {
+    args <- list(...)
+    if (length(unnamed(args)) > 0) {
+      stop("Tag ", tag, " can not have children", call. = FALSE)
+    }
+    attribs <- html_attributes(named(args))
+
+    html(paste0("<", tag, attribs, " />"))
+  }
+}
+img <- void_tag("img")
+img(src = "myimage.png", width = 100, height = 100)
+```
+
+```{r}
+tags <- c(
+  "a", "abbr", "address", "article", "aside", "audio",
+  "b", "bdi", "bdo", "blockquote", "body", "button", "canvas",
+  "caption", "cite", "code", "colgroup", "data", "datalist",
+  "dd", "del", "details", "dfn", "div", "dl", "dt", "em",
+  "eventsource", "fieldset", "figcaption", "figure", "footer",
+  "form", "h1", "h2", "h3", "h4", "h5", "h6", "head", "header",
+  "hgroup", "html", "i", "iframe", "ins", "kbd", "label",
+  "legend", "li", "mark", "map", "menu", "meter", "nav",
+  "noscript", "object", "ol", "optgroup", "option", "output",
+  "p", "pre", "progress", "q", "ruby", "rp", "rt", "s", "samp",
+  "script", "section", "select", "small", "span", "strong",
+  "style", "sub", "summary", "sup", "table", "tbody", "td",
+  "textarea", "tfoot", "th", "thead", "time", "title", "tr",
+  "u", "ul", "var", "video"
+)
+
+void_tags <- c(
+  "area", "base", "br", "col", "command", "embed",
+  "hr", "img", "input", "keygen", "link", "meta", "param",
+  "source", "track", "wbr"
+)
+```
+
+```{r}
+tag_fs <- c(
+  setNames(lapply(tags, tag), tags),
+  setNames(lapply(void_tags, void_tag), void_tags)
+)
+```
+
+```{r}
+tag_fs$p("Some text.", tag_fs$b("Some bold text"), tag_fs$i("Some italic text"))
+```
+
+```{r}
+with_html <- function(code) {
+  eval(substitute(code), tag_fs)
+}
+```
+
+```{r}
+with_html(body(
+  h1("A heading", id = "first"),
+  p("Some text &", b("some bold text.")),
+  img(src = "myimg.png", width = 100, height = 100)
+))
+```
+
+## 15.2 LaTeX
+
+```{r}
+to_math <- function(x) {
+  expr <- substitute(x)
+  eval(expr, latex_env(expr))
+}
+```
+
+```{r}
+greek <- c(
+  "alpha", "theta", "tau", "beta", "vartheta", "pi", "upsilon",
+  "gamma", "gamma", "varpi", "phi", "delta", "kappa", "rho",
+  "varphi", "epsilon", "lambda", "varrho", "chi", "varepsilon",
+  "mu", "sigma", "psi", "zeta", "nu", "varsigma", "omega", "eta",
+  "xi", "Gamma", "Lambda", "Sigma", "Psi", "Delta", "Xi",
+  "Upsilon", "Omega", "Theta", "Pi", "Phi"
+)
+greek_list <- setNames(paste0("\\", greek), greek)
+greek_env <- list2env(as.list(greek_list), parent = emptyenv())
+```
+
+```{r}
+latex_env <- function(expr) {
+  greek_env
+}
+
+to_math(pi)
+#> [1] "\\pi"
+to_math(beta)
+#> [1] "\\beta"
+```
+
+```{r}
+all_names <- function(x) {
+  if (is.atomic(x)) {
+    character()
+  } else if (is.name(x)) {
+    as.character(x)
+  } else if (is.call(x) || is.pairlist(x)) {
+    children <- lapply(x[-1], all_names)
+    unique(unlist(children))
+  } else {
+    stop("Don't know how to handle type ", typeof(x),
+      call. = FALSE
+    )
+  }
+}
+
+all_names(quote(x + y + f(a, b, c, 10)))
+#> [1] "x" "y" "a" "b" "c"
+```
+
+```{r}
+latex_env <- function(expr) {
+  names <- all_names(expr)
+  symbol_list <- setNames(as.list(names), names)
+  symbol_env <- list2env(symbol_list)
+
+  symbol_env
+}
+
+to_math(x)
+#> [1] "x"
+to_math(longvariablename)
+#> [1] "longvariablename"
+to_math(pi)
+```
+
+```{r}
+clone_env <- function(env, parent = parent.env(env)) {
+  list2env(as.list(env), parent = parent)
+}
+```
+
+```{r}
+latex_env <- function(expr) {
+  # Unknown symbols
+  names <- all_names(expr)
+  symbol_list <- setNames(as.list(names), names)
+  symbol_env <- list2env(symbol_list)
+
+  # Known symbols
+  clone_env(greek_env, symbol_env)
+}
+
+to_math(x)
+#> [1] "x"
+to_math(longvariablename)
+#> [1] "longvariablename"
+to_math(pi)
+#> [1] "\\pi"
+```
+
+```{r}
+unary_op <- function(left, right) {
+  force(left)
+  force(right)
+  function(e1) {
+    paste0(left, e1, right)
+  }
+}
+
+binary_op <- function(sep) {
+  force(sep)
+  function(e1, e2) {
+    paste0(e1, sep, e2)
+  }
+}
+```
+
+```{r}
+# Binary operators
+f_env <- new.env(parent = emptyenv())
+f_env$"+" <- binary_op(" + ")
+f_env$"-" <- binary_op(" - ")
+f_env$"*" <- binary_op(" * ")
+f_env$"/" <- binary_op(" / ")
+f_env$"^" <- binary_op("^")
+f_env$"[" <- binary_op("_")
+
+# Grouping
+f_env$"{" <- unary_op("\\left{ ", " \\right}")
+f_env$"(" <- unary_op("\\left( ", " \\right)")
+f_env$paste <- paste
+
+# Other math functions
+f_env$sqrt <- unary_op("\\sqrt{", "}")
+f_env$sin <- unary_op("\\sin(", ")")
+f_env$log <- unary_op("\\log(", ")")
+f_env$abs <- unary_op("\\left| ", "\\right| ")
+f_env$frac <- function(a, b) {
+  paste0("\\frac{", a, "}{", b, "}")
+}
+
+# Labelling
+f_env$hat <- unary_op("\\hat{", "}")
+f_env$tilde <- unary_op("\\tilde{", "}")
+```
+
+```{r}
+latex_env <- function(expr) {
+  # Known functions
+  f_env
+
+  # Default symbols
+  names <- all_names(expr)
+  symbol_list <- setNames(as.list(names), names)
+  symbol_env <- list2env(symbol_list, parent = f_env)
+
+  # Known symbols
+  greek_env <- clone_env(greek_env, parent = symbol_env)
+}
+
+to_math(sin(x + pi))
+#> [1] "\\sin(x + \\pi)"
+to_math(log(x_i^2))
+#> [1] "\\log(x_i^2)"
+to_math(sin(sin))
+#> [1] "\\sin(sin)"
+```
+
+```{r}
+all_calls <- function(x) {
+  if (is.atomic(x) || is.name(x)) {
+    character()
+  } else if (is.call(x)) {
+    fname <- as.character(x[[1]])
+    children <- lapply(x[-1], all_calls)
+    unique(c(fname, unlist(children)))
+  } else if (is.pairlist(x)) {
+    unique(unlist(lapply(x[-1], all_calls), use.names = FALSE))
+  } else {
+    stop("Don't know how to handle type ", typeof(x), call. = FALSE)
+  }
+}
+
+all_calls(quote(f(g + b, c, d(a))))
+#> [1] "f" "+" "d"
+```
+
+```{r}
+unknown_op <- function(op) {
+  force(op)
+  function(...) {
+    contents <- paste(..., collapse = ", ")
+    paste0("\\mathrm{", op, "}(", contents, ")")
+  }
+}
+```
+
+```{r}
+latex_env <- function(expr) {
+  calls <- all_calls(expr)
+  call_list <- setNames(lapply(calls, unknown_op), calls)
+  call_env <- list2env(call_list)
+
+  # Known functions
+  f_env <- clone_env(f_env, call_env)
+
+  # Default symbols
+  symbols <- all_names(expr)
+  symbol_list <- setNames(as.list(symbols), symbols)
+  symbol_env <- list2env(symbol_list, parent = f_env)
+
+  # Known symbols
+  greek_env <- clone_env(greek_env, parent = symbol_env)
+}
+
+to_math(f(a * b))
+#> [1] "\\mathrm{f}(a * b)"
+```

@@ -1,0 +1,24 @@
+---
+title: "note13"
+output: html_notebook
+---
+
+```{r}
+findruns <- function(x, k) {
+  n <- length(x)
+  runs <- NULL
+  for (i in 1:(n - k + 1)) {
+    if (all(x[i:(i + k - 1)] == 1)) runs <- c(runs, i)
+  }
+  runs
+}
+```
+
+```{r}
+x <- c(1, 0, 0, 1, 1, 0, 1, 1, 1)
+findruns(x, 2)
+```
+
+```{r}
+# debug(findruns)
+```

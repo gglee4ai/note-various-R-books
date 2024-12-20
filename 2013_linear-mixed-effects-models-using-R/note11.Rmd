@@ -1,0 +1,174 @@
+---
+title: "note11"
+output: html_notebook
+---
+
+# Fitting Linear Models with Fixed Effects and Correlated Errors: The gls() Function
+
+```{r}
+library(nlme)
+library(lattice)
+```
+
+## Inspecting and Modifying Objects of Class corStruct
+
+```{r}
+tx <- c(0, 10^-2, 0.8)
+tx
+```
+
+```{r}
+cX <-
+  corExp(
+    value = c(1, 0.2),
+    form = ~tx,
+    nugget = TRUE
+  )
+cX
+```
+
+```{r}
+Dtx <- data.frame(tx)
+cXi <- Initialize(cX, data = Dtx)
+cXi
+```
+
+```{r}
+Vrg <- Variogram(cXi)
+plot(Vrg, smooth = FALSE, type = "l")
+```
+
+```{r}
+corFunDt <-
+  data.frame(
+    dist = Vrg$dist,
+    corF = 1 - Vrg$variog
+  )
+plot(corFunDt, type = "l", ylim = c(0, 1))
+```
+
+```{r}
+xyplot(corF ~ dist, data = corFunDt, type = "l")
+```
+
+```{r}
+subj <- rep(1:2, each = 4)
+occ <- rep(1:4, 2)
+loc1 <- rep(c(0, 0.2, 0.4, 0.8), 2)
+loc2 <- c(0, 0.2, 0.4, 0.8, 0., 0.1, 0.2, 0.4)
+df0 <- data.frame(subj, occ, loc1, loc2)
+df0
+df <- subset(df0, subj != 2 | occ != 3)
+df
+```
+
+```{r}
+cs <- corCompSymm(value = 0.3, form = ~ 1 | subj)
+cs <- Initialize(cs, df)
+cs
+```
+
+```{r}
+coef(cs, unconstrained = FALSE)
+```
+
+```{r}
+coef(cs)
+```
+
+```{r}
+getCovariate(cs)
+```
+
+```{r}
+corMatrix(cs)
+```
+
+## Illustration of Correlation Structures
+
+```{r}
+cs1 <- corAR1(0.3, form = ~tx)
+coef(cs1, unconstrained = FALSE)
+```
+
+```{r}
+coef(cs1)
+```
+
+```{r}
+tx <- 1:4
+corMatrix(cs1, covariate = tx)
+```
+
+```{r}
+df2 <- data.frame(tx)
+cs1i <- Initialize(cs1, data = df2)
+corMatrix(cs1i)
+```
+
+```{r}
+chL <- corMatrix(cs1i, corr = FALSE)
+chL
+```
+
+```{r}
+solve(t(chL) %*% chL)
+```
+
+```{r}
+solve(t(chL) %*% chL)
+```
+
+```{r}
+car <- corAR1(value = 0.3, form = ~ 1 | subj)
+carI <- Initialize(car, df)
+carI
+```
+
+```{r}
+getCovariate(carI)
+```
+
+```{r}
+corMatrix(carI)
+```
+
+```{r}
+car1 <- corAR1(value = 0.3, form = ~ occ | subj)
+car1 <- Initialize(car1, df)
+getCovariate(car1)
+```
+
+```{r}
+corMatrix(car1)
+```
+
+```{r}
+ceE <- corExp(value = 1, form = ~ loc1 + loc2 | subj)
+ceE <- Initialize(ceE, df)
+ceE
+```
+
+```{r}
+corMatrix(ceE)
+```
+
+```{r}
+ceM <- corExp(1, ~ loc1 + loc2 | subj, metric = "manhattan")
+ceM <- Initialize(ceM, df)
+corMatrix(ceM)
+```
+
+```{r}
+ceEn <- corExp(c(1, 0.2), ~ loc1 + loc2 | subj, nugget = TRUE)
+ceEn <- Initialize(ceEn, df)
+ceEn
+```
+
+```{r}
+coef(ceEn, unconstrained = FALSE)
+```
+
+```{r}
+corMatrix(ceEn)
+```

@@ -1,0 +1,161 @@
+---
+title: "note02"
+output: html_notebook
+---
+
+```{r}
+library(ggplot2)
+library(fpp2)
+theme_set(theme_grey(base_family = "NanumGothic"))
+```
+
+# 시계열 시각화
+
+## 2.1 ts 객체
+
+```{r}
+y <- ts(c(123, 39, 78, 52, 110), start = 2012) # 기본이 year
+```
+
+```{r}
+ts(rnorm(100, mean = 100, sd = 10), start = 2003, frequency = 12)
+```
+
+```{r}
+ts(rnorm(100, mean = 100, sd = 10), start = 2003, frequency = 4)
+```
+
+```{r}
+ts(rnorm(100, mean = 100, sd = 10), start = 2003, frequency = 1)
+```
+
+```{r}
+ts(rnorm(100, mean = 100, sd = 10), start = 2003, frequency = 52)
+```
+
+## 2.2 시간 그래프
+
+```{r}
+autoplot(melsyd[, "Economy.Class"]) +
+  ggtitle("이코노미석 탑승객: 멜버른-시드니") +
+  xlab("연도") +
+  ylab("탑승객(단위: 1000명)")
+```
+
+```{r}
+autoplot(a10) +
+  ggtitle("당뇨병 약 매출") +
+  ylab("매출(단위: 백만 달러)") +
+  xlab("연도")
+```
+
+## 2.4 계절성 그래프
+
+```{r}
+a10 |>
+  ggseasonplot(year.labels = TRUE, year.labels.left = TRUE) +
+  ylab("백만 달러") +
+  xlab("월") +
+  ggtitle("계절성 그래프: 당뇨병 약 매출")
+```
+
+```{r}
+ggseasonplot(a10, polar = TRUE) +
+  ylab("백만 달러") +
+  xlab("월") +
+  ggtitle("계절성 극좌표 그래프: 당뇨병 약 매출")
+```
+
+## 2.5 계절성 부시계열 그래프
+
+```{r}
+a10 |>
+  ggsubseriesplot() +
+  ylab("백만 달러") +
+  xlab("월") +
+  ggtitle("계절성 부시계열 그래프: 당뇨병 약 매출")
+```
+
+## 2.6 산점도
+
+```{r}
+autoplot(elecdemand[, c("Demand", "Temperature")], facets = TRUE) +
+  xlab("연도: 2014") + ylab("") +
+  ggtitle("호주 빅토리아 주의 30분 단위의 전력 수요")
+```
+
+```{r}
+qplot(Temperature, Demand, data = as.data.frame(elecdemand)) +
+  ylab("수요 (단위: 기가 와트GW)") + xlab("기온 (섭씨)")
+```
+
+```{r}
+autoplot(visnights[, 1:5], facets = TRUE) +
+  ylab("각 분기별 여행자 숙박일 수(단위: 백만 명)")
+```
+
+```{r}
+GGally::ggpairs(as.data.frame(visnights[, 1:5]))
+```
+
+## 2.7 시차 그래프
+
+```{r}
+beer2 <- window(ausbeer, start = 1992)
+gglagplot(beer2) +
+  guides(color = guide_legend(title = "분기")) +
+  ggtitle("")
+```
+
+## 2.8 자기상관
+
+```{r}
+ggAcf(beer2)
+```
+
+```{r}
+aelec <- window(elec, start = 1980)
+autoplot(aelec) +
+  xlab("연도") + ylab("기가와트시(GWh)")
+```
+
+```{r}
+ggAcf(aelec, lag = 48)
+```
+
+## 2.9 백색잡음
+
+```{r}
+set.seed(30)
+y <- ts(rnorm(50))
+autoplot(y) + ggtitle("백색잡음")
+```
+
+```{r}
+ggAcf(y)
+```
+
+## 2.10 연습문제
+
+```{r}
+autoplot(gold)
+```
+
+```{r}
+autoplot(woolyrnq)
+```
+
+```{r}
+autoplot(gas)
+```
+
+```{r}
+frequency(gold)
+frequency(woolyrnq)
+gas |> frequency()
+```
+
+```{r}
+gold |> max(na.rm = TRUE)
+gold |> which.max()
+```

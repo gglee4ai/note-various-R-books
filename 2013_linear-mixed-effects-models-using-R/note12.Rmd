@@ -1,0 +1,242 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# ARMD Trial: Modeling Correlated Errors for Visual Acuity
+
+```{r}
+library(nlme)
+library(lattice)
+data(armd, package = "nlmeU")
+```
+
+## 12.2 The Model with Heteroscedastic, Independent Residual Errors Revisited
+
+```{r}
+lm1.form <- formula(visual ~ -1 + visual0 + time.f + treat.f:time.f)
+fm9.2 <-
+  gls(lm1.form,
+    weights = varPower(form = ~time),
+    data = armd
+  )
+```
+
+```{r}
+Vg1 <- Variogram(fm9.2, form = ~ time | subject)
+Vg1
+```
+
+```{r}
+plot(Vg1, smooth = FALSE, xlab = "Time difference")
+```
+
+```{r}
+Vg2 <- Variogram(fm9.2, form = ~ tp | subject)
+Vg2
+```
+
+```{r}
+plot(Vg2, smooth = FALSE, xlab = "Time Lag")
+```
+
+```{r}
+fm12.1 <-
+  gls(lm1.form,
+    weights = varPower(form = ~time),
+    correlation = corCompSymm(form = ~ 1 | subject),
+    data = armd
+  )
+fm12.1
+```
+
+```{r}
+intervals(fm12.1, which = "var-cov")
+```
+
+```{r}
+fm12.1vcov <- getVarCov(fm12.1, individual = "2")
+fm12.1vcov
+```
+
+```{r}
+nms <- c("4wks", "12wks", "24wks", "52wks")
+dnms <- list(nms, nms)
+dimnames(fm12.1vcov) <- dnms
+print(fm12.1vcov)
+```
+
+```{r}
+print(cov2cor(fm12.1vcov), corr = TRUE, stdevs = FALSE)
+```
+
+```{r}
+anova(fm9.2, fm12.1)
+```
+
+```{r}
+fm12.2 <-
+  update(fm9.2,
+    correlation = corAR1(form = ~ tp | subject),
+    data = armd
+  )
+fm12.2
+```
+
+```{r}
+intervals(fm12.2, which = "var-cov")
+```
+
+```{r}
+fm12.2vcov <- getVarCov(fm12.2, individual = "2")
+dimnames(fm12.2vcov) <- dnms
+fm12.2vcov
+```
+
+```{r}
+fm12.2cor <- cov2cor(fm12.2vcov)
+print(fm12.2cor, digits = 2, corr = TRUE, stdevs = FALSE)
+```
+
+```{r}
+anova(fm12.1, fm12.2)
+```
+
+## 12.5 General Correlation Matrix for Residual Errors
+
+```{r}
+fm12.3 <- update(
+  fm12.2,
+  correlation = corSymm(form = ~ tp | subject),
+  data = armd
+)
+fm12.3
+```
+
+```{r}
+intervals(fm12.3, which = "var-cov")
+```
+
+```{r}
+fm12.3vcov <- getVarCov(fm12.3, individual = "2")
+dimnames(fm12.3vcov) <- dnms
+fm12.3vcov
+```
+
+```{r}
+fm12.3cor <- cov2cor(fm12.3vcov)
+print(fm12.3cor, corr = TRUE, stdevs = FALSE)
+```
+
+```{r}
+anova(fm12.2, fm12.3)
+```
+
+```{r}
+fmA.vc <-
+  update(fm12.3, weights = varIdent(form = ~ 1 | time.f))
+fmA.vc
+```
+
+```{r}
+anova(fm12.3, fmA.vc)
+```
+
+## 12.6 Model-Fit Diagnostics
+
+```{r}
+panel.bwxplot0 <-
+  function(x, y, subscripts, ...) {
+    panel.grid(h = -1)
+    panel.stripplot(x, y, col = "grey", ...)
+    panel.bwplot(x, y, pch = "|", ...)
+  }
+bwplot(resid(fm12.3) ~ time.f | treat.f,
+  panel = panel.bwxplot0,
+  ylab = "Residuals",
+  data = armd
+)
+```
+
+```{r}
+plot(fm12.3)
+```
+
+```{r}
+plot(fm12.3, resid(., type = "p") ~ fitted(.) | time.f)
+```
+
+```{r}
+stdres.plot <-
+  plot(fm12.3, resid(., type = "p") ~ jitter(time) | treat.f,
+    id = 0.01, adj = c(-0.3, 0.5), grid = FALSE
+  )
+plot(update(stdres.plot), xlim = c(-5, 59), ylim = c(-4.9, 4.9), grid = "h")
+```
+
+```{r}
+bwplot(
+  resid(fm12.3, type = "n") ~ time.f | treat.f,
+  panel = panel.bwxplot0,
+  data = armd
+)
+```
+
+```{r}
+qqnorm(fm12.3, ~ resid(., type = "n") | time.f)
+```
+
+## 12.7 Inference About the Mean Structure
+
+```{r}
+anova(update(fm12.3, method = "ML"))
+```
+
+```{r}
+fm12.3a <- update(
+  fm12.3,
+  formula(visual ~ visual0 + time.f + treat.f + time.f:treat.f),
+  method = "ML",
+  data = armd
+)
+fm12.3a
+```
+
+```{r}
+fm12.4 <- update(
+  fm12.3,
+  formula(visual ~ visual0 + time + treat.f + treat.f:time),
+  method = "ML",
+  data = armd
+)
+fm12.4
+```
+
+```{r}
+fm12.5 <- update(
+  fm12.3,
+  formula(visual ~ visual0 + time.f + treat.f),
+  method = "ML",
+  data = armd
+)
+fm12.5
+```
+
+```{r}
+anova(fm12.3a, fm12.4, fm12.5)
+```
+
+```{r}
+anova(fm12.5)
+```
+
+```{r}
+fm12.5vcov <- getVarCov(fm12.5, individual = "2")
+dimnames(fm12.5vcov) <- dnms
+fm12.5vcov
+```
+
+```{r}
+fm12.5cor <- cov2cor(fm12.5vcov)
+print(fm12.5cor, corr = TRUE, stdevs = FALSE)
+```

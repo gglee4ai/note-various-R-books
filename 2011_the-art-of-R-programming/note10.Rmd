@@ -1,0 +1,124 @@
+---
+title: "note10"
+output: html_notebook
+---
+
+```{r}
+# v <- scan("")
+v <- c(2, 5, 13, 3, 4, 5, 8)
+```
+
+```{r}
+# w <- readline("type your initials: ")
+inits <- "NM"
+```
+
+```{r}
+x <- 1:3
+print(x^2)
+```
+
+```{r}
+cat("abc\n")
+```
+
+```{r}
+cat(x, "abc", "de\n")
+```
+
+```{r}
+cat(x, "abc", "de\n", sep = "")
+```
+
+```{r}
+cat(x, "abc", "de\n", "f", sep = "\n")
+```
+
+```{r}
+x <- c(5, 12, 13, 8, 88)
+cat(x, sep = c(".", ".", ",", "\n", "\n"))
+```
+
+```{r}
+z <- read.table("input/z.txt", header = TRUE)
+z
+```
+
+```{r}
+z1 <- readLines("input/z.txt")
+z1
+```
+
+```{r}
+c <- file("input/z.txt", "r")
+readLines(c, n = 1)
+readLines(c, n = 1)
+readLines(c, n = 1)
+readLines(c, n = 1)
+readLines(c, n = 1)
+readLines(c, n = 1)
+close(c)
+```
+
+```{r}
+c <- file("input/z.txt", "r")
+while (TRUE) {
+  rl <- readLines(c, n = 1)
+  if (length(rl) == 0) {
+    print("reached the end")
+    close(c)
+    break
+  } else {
+    print(rl)
+  }
+}
+```
+
+```{r}
+c <- file("input/z.txt", "r")
+readLines(c, n = 2)
+seek(c, where = 0)
+readLines(c, n = 1)
+close(c)
+```
+
+```{r}
+uci <- "http://archive.ics.uci.edu/ml/machine-learning-databases/"
+uci <- paste(uci, "echocardiogram/echocardiogram.data", sep = "")
+ecc <- read.csv(uci)
+ecc
+```
+
+```{r}
+kids <- c("Jack", "Jill")
+ages <- c(12, 10)
+d <- data.frame(kids, ages)
+d
+```
+
+```{r}
+write.table(d, "output/kds.txt")
+```
+
+```{r}
+write.table(d, "output/xcnew.txt", row.names = FALSE, col.names = FALSE)
+```
+
+```{r}
+cat("abc\n", file = "output/ut.txt")
+cat("de\n", file = "output/ut.txt", append = TRUE)
+```
+
+```{r}
+c <- file("output/www.txt", "w")
+writeLines(c("abc", "de", "f"), c)
+close(c)
+```
+
+```{r}
+dir()
+```
+
+```{r}
+str(file.info("note01.Rmd"))
+```

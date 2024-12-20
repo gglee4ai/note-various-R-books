@@ -1,0 +1,481 @@
+---
+title: "note20"
+output: html_notebook
+---
+
+# 20 Extensions of the R Tools for Linear Mixed-Effects Models
+
+## 20.2 The New pdMatClass: pdKronecker
+
+```{r}
+library(nlme)
+library(nlmeUpdK)
+```
+
+```{r}
+D1 <- c(3, 9, 9, 30)
+dim(D1) <- c(2, 2)
+D1
+```
+
+```{r}
+D2 <- c(2, 4, 4, 10)
+dim(D2) <- c(2, 2)
+D2
+```
+
+```{r}
+D1 %x% D2
+```
+
+```{r}
+pdId <- pdIdent(as.matrix(1), form = ~1)
+pd1 <- pdLogChol(D1, form = ~ f1 - 1)
+pd2 <- pdLogChol(D2, form = ~ f2 - 1)
+pdL1 <-
+  list(
+    X = pdId,
+    pD1 = pd1,
+    pD2 = pd2
+  )
+```
+
+```{r}
+f1 <- gl(2, 1, labels = c("A", "B"))
+f2 <- gl(2, 1, labels = c("a", "b"))
+(dt <- data.frame(f1, f2))
+```
+
+```{r}
+pdK <- pdKronecker(pdL1, data = dt)
+pdK
+```
+
+```{r}
+nms <- Names(pdK)
+nms
+```
+
+```{r}
+c0x <- as.matrix(pdK[[1]])
+c0x
+```
+
+```{r}
+D1x <- as.matrix(pdK[[2]])
+D1x
+```
+
+```{r}
+D2x <- as.matrix(pdK[[3]])
+D2x
+```
+
+```{r}
+Dx <- c0x %x% D1x %x% D2x
+dimnames(Dx) <- list(nms, nms)
+Dx
+```
+
+```{r}
+formula(pdK, asList = TRUE)
+```
+
+```{r}
+formula(pdK)
+```
+
+```{r}
+pdKform <- formula(~ (f2 - 1):(f1 - 1) - 1)
+pdKform
+```
+
+```{r}
+pdKterms <- terms(pdKform)
+labels(pdKterms)
+```
+
+```{r}
+attr(pdKterms, "intercept")
+```
+
+## 20.3 Influence Diagnostics
+
+```{r}
+data(armd, package = "nlmeU")
+lm3.form <- formula(visual ~ visual0 + time + treat.f)
+fm16.5 <- lme(lm3.form,
+  random = list(subject = pdDiag(~time)),
+  weights = varPower(form = ~time),
+  data = armd
+)
+summary(fm16.5)$tTable
+```
+
+```{r}
+fm16.5ml <- update(fm16.5, method = "ML")
+formula(fm16.5ml)
+```
+
+```{r}
+fm16.5ml$call$data
+```
+
+```{r}
+logLik(fm16.5ml)
+```
+
+```{r}
+beta0 <- fixef(fm16.5ml)
+beta0
+```
+
+```{r}
+names(beta0) <- abbreviate(names(beta0), minlength = 7)
+beta0
+```
+
+```{r}
+vcovb <- vcov(fm16.5ml)
+colnames(vcovb) <- names(beta0)
+vcovb
+```
+
+```{r}
+library(nlmeU)
+df1 <- subset(armd, subject %in% "1")
+logLik1(fm16.5ml, df1)
+```
+
+```{r}
+lLik.i <- by(armd, armd$subject, FUN = function(dfi) logLik1(fm16.5ml, dfi))
+lLik.i[1:5]
+```
+
+```{r}
+sum(lLik.i)
+```
+
+```{r}
+nx <- by(armd, armd$subject, nrow)
+```
+
+```{r}
+lLik.n <- lLik.i / as.vector(nx)
+outL <- lLik.n < -6
+lLik.n[outL]
+```
+
+```{r}
+subject.c <- levels(armd$subject)
+subject.x <- as.numeric(subject.c)
+plot(lLik.n ~ subject.x, type = "h")
+points(subject.x[outL], lLik.n[outL], type = "p", pch = 16)
+text(subject.x[outL], lLik.n[outL], subject.c[outL], adj = -0.1)
+```
+
+```{r}
+lmeU <- function(cx) {
+  dfU <- subset(armd, subject != cx)
+  update(fm16.5ml, data = dfU)
+}
+lmeUall <- lapply(subject.c, lmeU)
+names(lmeUall) <- subject.c
+```
+
+```{r}
+names(lmeUall)[1:6]
+dataU6 <- lmeUall[["6"]]$data
+dim(dataU6)
+```
+
+```{r}
+unique(dataU6$subject)[1:6]
+```
+
+```{r}
+lLik <- function(cx) {
+  lmeU <- lmeUall[[cx]]
+  lLikU <- logLik(lmeU, REML = FALSE)
+  df.s <- subset(armd, subject == cx)
+  lLik.s <- logLik1(lmeU, df.s)
+  lLikU + lLik.s
+}
+```
+
+```{r}
+lLikUall <- sapply(subject.c, lLik)
+dif.2Lik <- 2 * (logLik(fm16.5ml) - lLikUall)
+summary(dif.2Lik)
+```
+
+```{r}
+names(dif.2Lik) <- subject.c
+outL <- dif.2Lik > 0.5
+dif.2Lik[outL]
+```
+
+```{r}
+library(lattice)
+subject.f <- factor(subject.c, levels = subject.c)
+myPanel <- function(x, y, ...) {
+  x1 <- as.numeric(x)
+  panel.xyplot(x1, y, ...)
+  ltext(x1[outL], y[outL], subject.c[outL])
+}
+dtp <- dotplot(dif.2Lik ~ subject.f, panel = myPanel, type = "h")
+lxlims <- length(dtp$x.limits)
+update(dtp, xlim = rep("", lxlims), grid = "h")
+```
+
+```{r}
+betaUall <- sapply(lmeUall, fixef)
+vb.inv <- solve(vcovb)
+CookDfun <- function(betaU) {
+  dbetaU <- betaU - beta0
+  CookD.value <- t(dbetaU) %*% vb.inv %*% dbetaU
+}
+CookD.num <- apply(betaUall, 2, CookDfun)
+CookD.num
+```
+
+```{r}
+(n.fixeff <- length(beta0))
+```
+
+```{r}
+rankX <- n.fixeff
+CookD <- CookD.num / rankX
+```
+
+```{r}
+outD <- CookD > 0.03
+subject.c[outD]
+```
+
+```{r}
+plot(CookD ~ subject.c, ylab = "Cook's D", type = "h")
+text(as.numeric(subject.c[outD]), CookD[outD], subject.c[outD])
+points(subject.c[outD], CookD[outD])
+```
+
+## 20.4 Simulation of the Dependent Variable
+
+```{r}
+library(nlmeU)
+simY <- simulateY(fm16.5ml, nsim = 1000)
+str(simY)
+```
+
+```{r}
+auxDt <- subset(armd, select = c(subject, visual, visual0, time, treat.f))
+auxDt
+```
+
+```{r}
+simYsumm <-
+  apply(simY,
+    MARGIN = 2,
+    FUN = function(y) {
+      auxDt$visual <- y
+      auxFit <- update(fm16.5ml, data = auxDt)
+      summ <- summary(auxFit)
+      beta <- fixef(summ)
+      list(beta = beta)
+    }
+  )
+```
+
+```{r}
+simYsumm[[1]]
+```
+
+```{r}
+betaE <- sapply(simYsumm, FUN = function(x) x$beta)
+rowMeans(betaE)
+```
+
+```{r}
+cov(t(betaE))
+```
+
+## 20.5 Power Analysis
+
+```{r}
+formula(fm16.5)
+```
+
+```{r}
+anova(fm16.5)
+```
+
+```{r}
+anova(fm16.5, Terms = "treat.f")
+```
+
+```{r}
+anova(fm16.5, L = c("treat.fActive" = 1))
+```
+
+```{r}
+alpha <- 0.05
+df1 <- 1
+df2 <- 231
+Fvalue <- 5.5345
+Fcrit <- qf(1 - alpha, df1 = df1, df2 = df2, ncp = 0)
+Fcrit
+```
+
+```{r}
+nc <- Fvalue * df1
+pf(Fcrit, df1 = df1, df2 = df2, ncp = nc, lower.tail = FALSE)
+```
+
+```{r}
+library(nlmeU)
+Pwr(fm16.5)
+```
+
+```{r}
+Pwr(fm16.5, L = c("treat.fActive" = 1))
+```
+
+```{r}
+npg <- 20
+subject <- 1:(2 * npg)
+treat.f <- gl(2, npg, labels = c("Placebo", "Active"))
+dts <- data.frame(subject, treat.f)
+dtL <- list(time = c(4, 12, 24, 52), subject = subject)
+dtLong <- expand.grid(dtL)
+mrgDt <- merge(dtLong, dts, sort = FALSE)
+exmpDt <-
+  within(mrgDt, {
+    m0 <- 65 - 0.1 * time
+    mA <- 85 - 0.1 * time
+    mA <- ifelse(treat.f %in% "Active", mA, m0)
+  })
+```
+
+```{r}
+selDt <- with(exmpDt, {
+  lvls <- levels(treat.f)
+  i <- match(lvls, treat.f)
+  subj <- subject[i]
+  subset(exmpDt, subject %in% subj)
+})
+```
+
+```{r}
+library(lattice)
+xyplot(mA ~ time,
+  groups = treat.f,
+  data = selDt,
+  type = "l",
+  auto.key = list(lines = TRUE, ppoints = FALSE),
+  grid = TRUE
+)
+```
+
+```{r}
+D0 <- diag(c(100, 0.09))
+sgma <- 5
+D <- D0 / (sgma * sgma)
+D
+```
+
+```{r}
+pd1 <- pdDiag(D, form = ~time, data = armd)
+pd1
+```
+
+```{r}
+vF <- varPower(form = ~time, fixed = 0.15)
+vF
+```
+
+**여기 계산부터 에러가 있음**
+
+```{r}
+cntrl <-
+  lmeControl(
+    maxIter = 0,
+    msMaxIter = 0,
+    niterEm = 0,
+    returnObject = TRUE, opt = "optim"
+  )
+fmA <- lme(mA ~ time + treat.f,
+  random = list(subject = pd1),
+  weights = vF,
+  data = exmpDt,
+  control = cntrl
+)
+fmA
+```
+
+```{r}
+fixef(fmA)
+```
+
+**여기 계산부터 에러가 있음**
+
+```{r}
+sigma(fmA)
+```
+
+```{r}
+Pwr(fmA, sigma = sgma, L = c("treat.fActive" = 1))
+```
+
+```{r}
+dif <- seq(1, 15, by = 0.1)
+dim(dif) <- c(length(dif), 1)
+dtF <- Pwr(fmA, sigma = sgma, L = c("treat.fActive" = 1), altB = dif)
+dtF[, 1:4]
+```
+
+```{r}
+xyplot(Power ~ treat.fActive,
+  data = dtF, type = "l",
+  auto.key = list(lines = TRUE, points = FALSE),
+  grid = TRUE
+)
+```
+
+```{r}
+simA <- simulateY(fmA, sigma = sgma, nsim = 1000)
+```
+
+```{r}
+dt <- exmpDt
+simfmA <-
+  apply(
+    simA,
+    2,
+    function(y) {
+      dt$mA <- y
+      auxFit <- update(fmA, data = dt)
+      anova(auxFit)
+    }
+  )
+simfmA[[1]]
+```
+
+```{r}
+FstatE <-
+  sapply(simfmA, function(x) x["treat.f", "F-value"])
+summary(FstatE)
+```
+
+```{r}
+Fcrit <- qf(1 - 0.05, 1, 38, ncp = 0)
+```
+
+```{r}
+nsim <- length(FstatE)
+nsim
+```
+
+```{r}
+powerE <- sum(FstatE > Fcrit) / nsim
+powerE
+```

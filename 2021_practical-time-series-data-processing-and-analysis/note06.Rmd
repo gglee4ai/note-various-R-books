@@ -1,0 +1,1092 @@
+---
+title: "note06"
+output: html_notebook
+---
+
+```{r}
+load("./data-tidied/dataset.rdata")
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(ggplot2)
+theme_set(theme_gray(base_family = "NanumGothic"))
+```
+
+# 6 시계열 forecasting Part II - 시계열 예측 모델
+
+## 6.1 평균 모델
+
+```{r}
+library(forecast)
+```
+
+```{r}
+stu1 <-
+  students.ts[, 2] |>
+  meanf() |>
+  summary()
+stu1
+```
+
+```{r}
+stu1 |>
+  autoplot(
+    main = "학생수 평균 모델 플롯",
+    xlab = "연도",
+    ylab = "학생수"
+  )
+```
+
+```{r}
+students.ts[, 2] |>
+  meanf(bootstrap = TRUE) |>
+  autoplot(
+    main = "학생수 평균 모델 플롯(부트스트랩)",
+    xlab = "연도",
+    ylab = "학생수"
+  )
+```
+
+```{r}
+employees.ts[, 2] |>
+  meanf() |>
+  autoplot(
+    main = "신규 취업자수 평균 모델 플롯",
+    xlab = "연도",
+    ylab = "취업자수"
+  )
+```
+
+```{r}
+covid19.ts[, 2] |>
+  meanf(bootstrap = TRUE) |>
+  autoplot(
+    main = "코로나 확진자(0-9세) 평균 모델 플롯(부트스트랩)",
+    xlab = "기간",
+    ylab = "확진자수"
+  )
+```
+
+## 6.2 단순 모델
+
+```{r}
+students.ts[, 2] |>
+  naive() |>
+  summary()
+```
+
+```{r}
+students.ts[, 2] |>
+  naive() |>
+  autoplot(
+    main = "전체 학생수 단순 모델 플롯",
+    xlab = "연도",
+    ylab = "학생수"
+  )
+```
+
+```{r}
+employees.ts[, 2] |>
+  naive() |>
+  summary()
+```
+
+```{r}
+employees.ts[, 2] |>
+  naive() |>
+  autoplot(
+    main = "신규 취업자수 단순 모델 플롯",
+    xlab = "연도",
+    ylab = "취업자수"
+  )
+```
+
+```{r}
+covid19.ts[, 2] |>
+  naive() |>
+  summary()
+```
+
+```{r}
+covid19.ts[, 2] |>
+  naive() |>
+  autoplot(
+    main = "코로나19 확진자(0-9세)의 단순 모델 플롯",
+    xlab = "기간",
+    ylab = "확진자수"
+  )
+```
+
+## 6.3 계절성 단순 모델
+
+```{r}
+students.ts[, 2] |>
+  snaive(10) |>
+  summary()
+```
+
+```{r}
+students.ts[, 2] |>
+  snaive(10) |>
+  autoplot(
+    main = "전체 학생수 계절성 단순 모델 플롯",
+    xlab = "연도",
+    ylab = "학생수"
+  )
+```
+
+```{r}
+employees.ts[, 2] |>
+  snaive(10) |>
+  summary()
+```
+
+```{r}
+employees.ts[, 2] |>
+  snaive(10) |>
+  autoplot(
+    main = "신규 취업자수 계절성 단순 모델 플롯",
+    xlab = "연도",
+    ylab = "취업자수"
+  )
+```
+
+## 6.4 랜덤워크 모델
+
+```{r}
+students.ts[, 2] |>
+  rwf() |>
+  summary()
+```
+
+```{r}
+students.ts[, 2] |>
+  rwf() |>
+  autoplot(
+    main = "전체 학생수 련덤위크 모델 플롯",
+    xlab = "연도",
+    ylab = "학생수"
+  )
+```
+
+```{r}
+students.ts[, 2] |>
+  rwf(drift = TRUE) |>
+  summary()
+```
+
+```{r}
+students.ts[, 2] |>
+  rwf(drift = TRUE) |>
+  autoplot(
+    main = "전체 학생수 련덤위크 모델 플롯",
+    xlab = "연도",
+    ylab = "학생수"
+  )
+```
+
+```{r}
+employees.ts[, 2] |>
+  rwf() |>
+  summary()
+```
+
+```{r}
+employees.ts[, 2] |>
+  rwf() |>
+  autoplot(
+    main = "신규 취업자수 랜덤워크 모델 플롯",
+    xlab = "연도",
+    ylab = "취업자수"
+  )
+```
+
+```{r}
+employees.ts[, 2] |>
+  rwf(drift = TRUE) |>
+  summary()
+```
+
+```{r}
+employees.ts[, 2] |>
+  rwf(drift = TRUE) |>
+  autoplot(
+    main = "신규 취업자수 랜덤워크 모델 플롯",
+    xlab = "연도",
+    ylab = "취업자수"
+  )
+```
+
+```{r}
+covid19.ts[, 2] |>
+  rwf(30) |>
+  summary()
+```
+
+```{r}
+covid19.ts[, 2] |>
+  rwf(30) |>
+  autoplot(
+    main = "코로나19 확진자(0-9세)의 랜덤워크 모델 플롯",
+    xlab = "기간",
+    ylab = "확진자수"
+  )
+```
+
+```{r}
+covid19.ts[, 2] |>
+  rwf(30, drift = TRUE) |>
+  summary()
+```
+
+```{r}
+covid19.ts[, 2] |>
+  rwf(30, drift = TRUE) |>
+  autoplot(
+    main = "코로나19 확진자(0-9세)의 랜덤워크 모델 플롯",
+    xlab = "기간",
+    ylab = "확진자수"
+  )
+```
+
+```{r}
+set.seed(345)
+whitenoise <- ts(rnorm(100), start = 1)
+ts.plot(whitenoise, ylab = "")
+```
+
+```{r}
+whitenoise.to.randomwalk <- cumsum(whitenoise)
+ts.plot(whitenoise.to.randomwalk, ylab = "")
+```
+
+```{r}
+randomwalk.to.whitenoise <- diff(whitenoise.to.randomwalk)
+ts.plot(randomwalk.to.whitenoise, ylab = "")
+```
+
+```{r}
+autoplot(students.ts[, 2]) +
+  autolayer(meanf(students.ts[, 2], h = 10), PI = FALSE, series = "평균") +
+  autolayer(naive(students.ts[, 2], h = 10), PI = FALSE, series = "단순") +
+  autolayer(snaive(students.ts[, 2], h = 10), PI = FALSE, series = "계절성 단순") +
+  autolayer(rwf(students.ts[, 2], h = 10), PI = FALSE, series = "랜덤워크") +
+  autolayer(rwf(students.ts[, 2], h = 10, drift = TRUE), PI = FALSE, series = "랜덤워크-드리프트") +
+  labs(
+    title = "전체 학생수의 평균, 단순, 계절성 단순, 랜덤워크 모델 예측값",
+    x = "연도",
+    y = "학생수"
+  )
+```
+
+```{r}
+autoplot(employees.ts[, 2]) +
+  autolayer(meanf(employees.ts[, 2], h = 10), PI = FALSE, series = "평균") +
+  autolayer(naive(employees.ts[, 2], h = 10), PI = FALSE, series = "단순") +
+  autolayer(snaive(employees.ts[, 2], h = 10), PI = FALSE, series = "계절성 단순") +
+  autolayer(rwf(employees.ts[, 2], h = 10), PI = FALSE, series = "랜덤워크") +
+  autolayer(rwf(employees.ts[, 2], h = 10, drift = TRUE), PI = FALSE, series = "랜덤워크-드리프트") +
+  labs(
+    title = "신규 취업자수의 평균, 단순, 계절성 단순, 랜덤워크 모델 예측값",
+    x = "연도",
+    y = "취업자수"
+  )
+```
+
+```{r}
+autoplot(covid19.ts[, 2]) +
+  autolayer(meanf(covid19.ts[, 2], h = 30), PI = FALSE, series = "평균") +
+  autolayer(naive(covid19.ts[, 2], h = 30), PI = FALSE, series = "단순") +
+  # autolayer(snaive(covid19.ts[,2], h = 30), PI = FALSE, series = "계절성 단순") +
+  autolayer(rwf(covid19.ts[, 2], h = 30), PI = FALSE, series = "랜덤워크") +
+  autolayer(rwf(covid19.ts[, 2], h = 30, drift = TRUE), PI = FALSE, series = "랜덤워크-드리프트") +
+  labs(
+    title = "전체 학생수의 평균, 단순, 계절성 단순, 랜덤워크 모델 예측값",
+    x = "연도",
+    y = "학생수"
+  )
+```
+
+## 6.5 회귀 모델
+
+```{r}
+student.ts.lm <- tslm(students.ts[, 2] ~ trend, data = students.ts)
+summary(student.ts.lm)
+```
+
+```{r}
+student.ts.lm |>
+  forecast() |>
+  autoplot() +
+  labs(
+    title = "전체 학생수에 대한 시계열 선형 회귀 예측 결과",
+    x = "연도",
+    y = "학생수"
+  )
+```
+
+```{r}
+student.ts.lm <- tslm(students.ts[, 4] ~ students.ts[, 3] + trend, data = students.ts)
+student.ts.lm |>
+  forecast(h = 22) |>
+  autoplot(
+    main = "유치원 학생수와 추세를 활용한 초등학생수 시계열 선형 회귀 예측 결과",
+    xlab = "연도",
+    ylab = "학생수"
+  )
+```
+
+```{r}
+try(student.ts.lm <- tslm(students.ts[, 2] ~ trend + season, data = students.ts))
+```
+
+```{r}
+employee.total.ts.lm <- tslm(employees.ts[, 2] ~ trend, data = employees.ts)
+summary(employee.total.ts.lm)
+```
+
+```{r}
+employee.total.ts.lm |>
+  forecast() |>
+  autoplot() +
+  labs(
+    title = "신규 취업자수에 대한 시계열 선형 회귀 예측 결과",
+    x = "시간", y = "취업자수"
+  )
+```
+
+```{r}
+employee.total.ts.lm <- tslm(employees.ts[, 2] ~ trend + season, data = employees.ts)
+summary(employee.total.ts.lm)
+```
+
+```{r}
+employee.total.ts.lm |>
+  forecast() |>
+  autoplot() +
+  labs(
+    title = "신규 취업자수에 대한 시계열 계절성 선형 회귀 예측 결과",
+    x = "시간",
+    y = "취업자수"
+  )
+```
+
+```{r}
+checkresiduals(tslm(students.ts[, 2] ~ trend, data = students.ts))
+```
+
+```{r}
+library(timetk)
+library(lubridate)
+```
+
+```{r}
+plot_time_series_regression(
+  .data = students,
+  .date_var = 연도,
+  .formula = 학생수계 ~ 연도,
+  .interactive = FALSE,
+  .show_summary = TRUE
+) +
+  labs(
+    title = "timetk를 사용한 전체 학생수 시계열 회귀 모델",
+    x = "연도",
+    y = "학생수"
+  )
+```
+
+```{r}
+employees |>
+  mutate(date = zoo::as.yearmon(time, "%Y. %m")) |>
+  plot_time_series_regression(
+    .data = _,
+    .date_var = time,
+    .formula = total ~ as.numeric((date)),
+    .interactive = FALSE
+  ) +
+  labs(
+    title = "timetk를 사용한 신규 취업자수 시계열 회귀 모델",
+    x = "연도",
+    y = "취업자수"
+  )
+```
+
+```{r}
+employees |>
+  mutate(date = zoo::as.yearmon(time, "%Y. %m")) |>
+  plot_time_series_regression(
+    .data = _,
+    .date_var = time,
+    .formula = total ~ year(date) + month(date, label = TRUE),
+    .interactive = FALSE
+  )
+```
+
+## 6.6 지수 평활 모델
+
+```{r}
+ses(students.ts[, 2]) |>
+  summary()
+```
+
+```{r}
+autoplot(students.ts[, 2]) +
+  autolayer(fitted(ses(students.ts[, 2])), series = "적합값")
+```
+
+```{r}
+autoplot(students.ts[, 2]) +
+  autolayer(fitted(ses(students.ts[, 2])), series = "적합값") +
+  autolayer(ses(students.ts[, 2]), PI = FALSE, series = "0.99") +
+  autolayer(ses(students.ts[, 2], alpha = 0.5), PI = FALSE, series = "0.5") +
+  autolayer(ses(students.ts[, 2], alpha = 0.3), PI = FALSE, series = "0.3") +
+  labs(
+    title = "alpha값에 따른 단순 지수 평활 모델(전체 학생수)",
+    x = "연도",
+    y = "학생수",
+    color = "alpha"
+  )
+```
+
+```{r}
+autoplot(employees.ts[, 2]) +
+  autolayer(fitted(ses(employees.ts[, 2])), series = "적합값") +
+  autolayer(ses(employees.ts[, 2]), PI = FALSE, series = "0.99") +
+  autolayer(ses(employees.ts[, 2], alpha = 0.3), PI = FALSE, series = "0.3") +
+  autolayer(ses(employees.ts[, 2], alpha = 0.5), PI = FALSE, series = "0.5") +
+  autolayer(ses(employees.ts[, 2], alpha = 0.7), PI = FALSE, series = "0.7") +
+  labs(
+    title = "alpha값에 따른 단순 지수 평활 모델(신규 취업자수)",
+    x = "연도",
+    y = "취업자수",
+    color = "alpha"
+  )
+```
+
+```{r}
+autoplot(covid19.ts[, 2]) +
+  autolayer(fitted(ses(covid19.ts[, 2])), series = "적합값") +
+  autolayer(ses(covid19.ts[, 2], h = 30), PI = FALSE, series = "0.99") +
+  autolayer(ses(covid19.ts[, 2], alpha = 0.3, h = 30), PI = FALSE, series = "0.3") +
+  autolayer(ses(covid19.ts[, 2], alpha = 0.5, h = 30), PI = FALSE, series = "0.5") +
+  autolayer(ses(covid19.ts[, 2], alpha = 0.7, h = 30), PI = FALSE, series = "0.7") +
+  labs(
+    title = "alpha값에 따른 단순 지수 평활 모델(신규 확진자수)",
+    x = "연도",
+    y = "확진자수",
+    color = "alpha"
+  )
+```
+
+```{r}
+autoplot(students.ts[, 2], color = "black") +
+  autolayer(fitted(ses(students.ts[, 2], alpha = 0.1)), series = "0.1") +
+  autolayer(fitted(ses(students.ts[, 2], alpha = 0.2)), series = "0.2") +
+  autolayer(fitted(ses(students.ts[, 2], alpha = 0.3)), series = "0.3") +
+  autolayer(fitted(ses(students.ts[, 2], alpha = 0.4)), series = "0.4") +
+  autolayer(fitted(ses(students.ts[, 2], alpha = 0.5)), series = "0.5") +
+  autolayer(fitted(ses(students.ts[, 2], alpha = 0.6)), series = "0.6") +
+  autolayer(fitted(ses(students.ts[, 2], alpha = 0.7)), series = "0.7") +
+  autolayer(fitted(ses(students.ts[, 2], alpha = 0.8)), series = "0.8") +
+  autolayer(fitted(ses(students.ts[, 2], alpha = 0.9)), series = "0.9") +
+  autolayer(ses(students.ts[, 2], alpha = 0.1, h = 30), PI = FALSE, series = "0.1") +
+  autolayer(ses(students.ts[, 2], alpha = 0.2, h = 30), PI = FALSE, series = "0.2") +
+  autolayer(ses(students.ts[, 2], alpha = 0.3, h = 30), PI = FALSE, series = "0.3") +
+  autolayer(ses(students.ts[, 2], alpha = 0.4, h = 30), PI = FALSE, series = "0.4") +
+  autolayer(ses(students.ts[, 2], alpha = 0.5, h = 30), PI = FALSE, series = "0.5") +
+  autolayer(ses(students.ts[, 2], alpha = 0.6, h = 30), PI = FALSE, series = "0.6") +
+  autolayer(ses(students.ts[, 2], alpha = 0.7, h = 30), PI = FALSE, series = "0.7") +
+  autolayer(ses(students.ts[, 2], alpha = 0.8, h = 30), PI = FALSE, series = "0.8") +
+  autolayer(ses(students.ts[, 2], alpha = 0.9, h = 30), PI = FALSE, series = "0.9") +
+  labs(
+    title = "alpha값에 따른 단순 지수 평활 모델(신규 확진자수)",
+    x = "연도",
+    y = "확진자수",
+    color = "alpha"
+  )
+```
+
+```{r}
+summary(holt(students.ts[, 2]))
+```
+
+```{r}
+autoplot(students.ts[, 2]) +
+  autolayer(fitted(holt(students.ts[, 2])), series = "적합값") +
+  autolayer(holt(students.ts[, 2]), series = "예측값") +
+  labs(title = "전체 학생수에 대한 홀트 지수 평활 모델", x = "연도", y = "학생수")
+```
+
+```{r}
+autoplot(employees.ts[, 2]) +
+  autolayer(fitted(holt(employees.ts[, 2])), series = "적합값") +
+  autolayer(holt(employees.ts[, 2]), series = "예측값") +
+  labs(
+    title = "신규 취업자수에 대한 홀트 지수 평활 모델",
+    x = "연도",
+    y = "취업자수"
+  )
+```
+
+```{r}
+autoplot(covid19.ts[, 2]) +
+  autolayer(fitted(holt(covid19.ts[, 2])), series = "적합값") +
+  autolayer(holt(covid19.ts[, 2], h = 30), series = "예측값") +
+  labs(
+    title = "코로나 확진수(0-9세)에 대한 홀트 지수 평활 모델",
+    x = "연도",
+    y = "확진자수"
+  )
+```
+
+```{r}
+autoplot(students.ts[, 2]) +
+  autolayer(fitted(holt(students.ts[, 2])), series = "홀트 적합") +
+  autolayer(fitted(holt(students.ts[, 2], damped = TRUE)), series = "감쇠 적합") +
+  autolayer(holt(students.ts[, 2]), series = "홀트 예측", PI = FALSE) +
+  autolayer(holt(students.ts[, 2], damped = TRUE), series = "감쇠 예측", PI = FALSE) +
+  labs(
+    title = "전체 학생수에 대한 감쇠 홀트 지수 평활 모델",
+    x = "연도", y = "학생수"
+  )
+```
+
+```{r}
+autoplot(employees.ts[, 2]) +
+  autolayer(fitted(holt(employees.ts[, 2])), series = "홀트 적합") +
+  autolayer(fitted(holt(employees.ts[, 2], damped = TRUE)), series = "감쇠 적합") +
+  autolayer(holt(employees.ts[, 2]), series = "홀트 예측", PI = FALSE) +
+  autolayer(holt(employees.ts[, 2], damped = TRUE), series = "감쇠 예측", PI = FALSE) +
+  labs(
+    title = "신규 취업자수에 대한 감쇠 홀트 지수 평활 모델",
+    x = "연도",
+    y = "취업자수"
+  )
+```
+
+```{r}
+autoplot(covid19.ts[, 2]) +
+  autolayer(fitted(holt(covid19.ts[, 2])), series = "홀트 적합") +
+  autolayer(fitted(holt(covid19.ts[, 2], damped = TRUE)), series = "감쇠 적합") +
+  autolayer(holt(covid19.ts[, 2], h = 30), series = "홀트 예측", PI = FALSE) +
+  autolayer(holt(covid19.ts[, 2], h = 30, damped = TRUE), series = "감쇠 예측", PI = FALSE) +
+  labs(
+    title = "코로나 확진수(0-9세)에 대한 홀트 지수 평활 모델",
+    x = "연도",
+    y = "확진자수"
+  )
+```
+
+```{r}
+autoplot(students.ts[, 2], color = "black") +
+  autolayer(fitted(holt(students.ts[, 2], beta = 0.1)), series = "0.1") +
+  autolayer(fitted(holt(students.ts[, 2], beta = 0.2)), series = "0.2") +
+  autolayer(fitted(holt(students.ts[, 2], beta = 0.3)), series = "0.3") +
+  autolayer(fitted(holt(students.ts[, 2], beta = 0.4)), series = "0.4") +
+  autolayer(fitted(holt(students.ts[, 2], beta = 0.5)), series = "0.5") +
+  autolayer(fitted(holt(students.ts[, 2], beta = 0.6)), series = "0.6") +
+  autolayer(fitted(holt(students.ts[, 2], beta = 0.7)), series = "0.7") +
+  autolayer(fitted(holt(students.ts[, 2], beta = 0.8)), series = "0.8") +
+  autolayer(fitted(holt(students.ts[, 2], beta = 0.9)), series = "0.9") +
+  autolayer(holt(students.ts[, 2], beta = 0.1, h = 30), PI = FALSE, series = "0.1") +
+  autolayer(holt(students.ts[, 2], beta = 0.2, h = 30), PI = FALSE, series = "0.2") +
+  autolayer(holt(students.ts[, 2], beta = 0.3, h = 30), PI = FALSE, series = "0.3") +
+  autolayer(holt(students.ts[, 2], beta = 0.4, h = 30), PI = FALSE, series = "0.4") +
+  autolayer(holt(students.ts[, 2], beta = 0.5, h = 30), PI = FALSE, series = "0.5") +
+  autolayer(holt(students.ts[, 2], beta = 0.6, h = 30), PI = FALSE, series = "0.6") +
+  autolayer(holt(students.ts[, 2], beta = 0.7, h = 30), PI = FALSE, series = "0.7") +
+  autolayer(holt(students.ts[, 2], beta = 0.8, h = 30), PI = FALSE, series = "0.8") +
+  autolayer(holt(students.ts[, 2], beta = 0.9, h = 30), PI = FALSE, series = "0.9") +
+  labs(
+    title = "alpha값에 따른 단순 지수 평활 모델(신규 확진자수)",
+    x = "연도",
+    y = "확진자수",
+    color = "beta"
+  )
+```
+
+```{r}
+autoplot(employees.ts[, 2]) +
+  autolayer(fitted(hw(employees.ts[, 2])), series = "홀트 윈터 적합값") +
+  autolayer(hw(employees.ts[, 2], seasonal = "additive"), PI = FALSE, series = "덧셈방법") +
+  autolayer(hw(employees.ts[, 2], seasonal = "multiplicative"), PI = FALSE, series = "곱셈방법") +
+  labs(
+    title = "신규 취업자수에 대한 홀트 윈터 지수 평활 모델",
+    x = "연도",
+    y = "취업자수"
+  )
+```
+
+```{r}
+ets(students.ts[, 2])
+```
+
+```{r}
+ets(students.ts[, 2]) |>
+  autoplot()
+```
+
+```{r}
+ets(students.ts[, 2]) |>
+  forecast() |>
+  autoplot() +
+  labs(
+    title = "전체 학생수에 대한 ets(A, Ad, N) 모델 예측 결과",
+    x = "연도", y = "학생수"
+  )
+```
+
+```{r}
+ets(employees.ts[, 2])
+```
+
+```{r}
+ets(employees.ts[, 2]) |>
+  autoplot()
+```
+
+```{r}
+ets(employees.ts[, 2]) |>
+  forecast() |>
+  autoplot() +
+  labs(
+    title = "신규 취업자에 대한 ets(M, Ad, A) 예측 결과",
+    x = "연도", y = "취업자수"
+  )
+```
+
+## 6.7 ARIMA 모델
+
+```{r}
+library(tseries)
+set.seed(345)
+arima100 <- arima.sim(model = list(order = c(1, 0, 0), ar = 0.9), n = 200)
+arima100 |> autoplot(main = "AR(1) 모델")
+```
+
+```{r}
+urca::ur.kpss(arima100) |>
+  urca::summary()
+```
+
+```{r}
+ndiffs(arima100, test = "kpss")
+```
+
+```{r}
+set.seed(345)
+arima110 <- arima.sim(model = list(order = c(1, 1, 0), ar = 0.9), n = 200)
+arima110 |> autoplot(main = "AR(1), 차분 1 모델")
+```
+
+```{r}
+urca::ur.kpss(arima110) |>
+  urca::summary()
+```
+
+```{r}
+ndiffs(arima110, test = "kpss")
+```
+
+```{r}
+urca::ur.kpss(diff(arima110)) |>
+  urca::summary()
+```
+
+```{r}
+arima100 |>
+  ggtsdisplay()
+```
+
+```{r}
+arima110 |>
+  ggtsdisplay()
+```
+
+```{r}
+set.seed(345)
+arima001 <- arima.sim(model = list(order = c(0, 0, 1), ma = 0.9), n = 200)
+arima001 |> autoplot(main = "MA(1) 모델")
+```
+
+```{r}
+urca::ur.kpss(arima001) |>
+  urca::summary()
+```
+
+```{r}
+ndiffs(arima001)
+```
+
+```{r}
+set.seed(345)
+arima011 <- arima.sim(model = list(order = c(0, 1, 1), ma = 0.9), n = 200)
+arima011 |> autoplot(main = "MA(1), 차분 1모델")
+```
+
+```{r}
+urca::ur.kpss(arima011) |>
+  urca::summary()
+```
+
+```{r}
+ndiffs(arima011, test = "kpss")
+```
+
+```{r}
+arima001 |> ggtsdisplay()
+```
+
+```{r}
+arima011 |> ggtsdisplay()
+```
+
+```{r}
+set.seed(345)
+arima101 <- arima.sim(model = list(order = c(1, 0, 1), ar = 0.9, ma = 0.9), n = 200)
+arima101 |> autoplot(main = "AR(1), MA(1) 모델")
+```
+
+```{r}
+arima101 |>
+  ggtsdisplay()
+```
+
+```{r}
+# install.packages("astsa")
+library(astsa)
+sarima(arima101, p = 1, d = 0, q = 1)
+```
+
+```{r}
+students.ts[, 2] |>
+  ggtsdisplay()
+```
+
+```{r}
+urca::ur.kpss(students.ts[, 2]) |>
+  urca::summary()
+```
+
+```{r}
+ndiffs(students.ts[, 2], test = "kpss")
+```
+
+```{r}
+sarima(students.ts[, 2], p = 1, d = 2, q = 0)
+```
+
+```{r}
+Arima(students.ts[, 2], order = c(1, 2, 0))
+```
+
+```{r}
+Arima(students.ts[, 2], order = c(1, 2, 0)) |>
+  forecast() |>
+  autoplot() +
+  labs(
+    title = "전체 학생수에 대한 ARIMA(1, 2, 0) 모델 예측 결과",
+    x = "연도",
+    y = "학생수"
+  )
+```
+
+```{r}
+sarima(students.ts[, 2], p = 1, d = 2, q = 0)
+```
+
+```{r}
+auto.arima(students.ts[, 2])
+```
+
+```{r}
+auto.arima(students.ts[, 2]) |>
+  forecast() |>
+  autoplot() +
+  labs(
+    title = "전체 학생수에 대한 ARIMA(1, 2, 0) 모델 예측 결과",
+    x = "연도",
+    y = "학생수"
+  )
+```
+
+```{r}
+urca::ur.kpss(covid19.ts[, 2]) |>
+  urca::summary()
+```
+
+```{r}
+ndiffs(covid19.ts[, 2], test = "kpss")
+```
+
+```{r}
+diff(covid19.ts[, 2]) |>
+  ggtsdisplay()
+```
+
+```{r}
+auto.arima(covid19.ts[, 2])
+```
+
+```{r}
+sarima(covid19.ts[, 2], 2, 1, 1)
+```
+
+```{r}
+employees |>
+  mutate(
+    year = year(time),
+    qtr = quarter(time)
+  ) |>
+  group_by(year, qtr) |>
+  summarize(sum = sum(total), .groups = "drop") |>
+  ungroup() |>
+  ts(frequency = 4, start = c(2013, 1)) ->
+qtr.employees.ts
+auto.arima(qtr.employees.ts[, 3]) |>
+  summary()
+```
+
+```{r}
+qtr.employees.ts[, 3] |>
+  tsdisplay()
+```
+
+```{r}
+qtr.employees.ts[, 3] |>
+  urca::ur.kpss() |>
+  urca::summary()
+```
+
+```{r}
+qtr.employees.ts[, 3] |> ndiffs()
+```
+
+```{r}
+qtr.employees.ts[, 3] |>
+  diff() |>
+  tsdisplay(lag.max = 36)
+```
+
+```{r}
+sarima(qtr.employees.ts[, 3], p = 0, d = 1, q = 0, P = 1, D = 1, Q = 0, S = 4)
+```
+
+```{r}
+auto.arima(qtr.employees.ts[, 3])
+```
+
+```{r}
+sarima(qtr.employees.ts[, 3], 0, 1, 0, 0, 1, 0, 4)
+```
+
+```{r}
+arima010110 <- Arima(qtr.employees.ts[, 3], order = c(0, 1, 0), seasonal = c(1, 1, 0))
+summary(arima010110)
+```
+
+```{r}
+arima010010 <- Arima(qtr.employees.ts[, 3], order = c(0, 1, 0), seasonal = c(0, 1, 0))
+summary(arima010010)
+```
+
+```{r}
+forecast010110 <- arima010110 |> forecast()
+forecast010010 <- arima010010 |> forecast()
+autoplot(qtr.employees.ts[, 3]) +
+  autolayer(forecast010110, PI = F, series = "010110") +
+  autolayer(forecast010010, PI = F, series = "010010") +
+  labs(
+    title = "분기별 취업자수에 대한 ARIMA(0,1,0)(0,1,0)[4]와 ARIMA(0,1,0)(1,1,0)[4] 예측결과",
+    x = "연동", y = "취업자수", color = "모델"
+  )
+```
+
+```{r}
+employees.ts[, 2] |>
+  auto.arima()
+```
+
+```{r}
+employees.ts[, 2] |>
+  tsdisplay()
+```
+
+```{r}
+employees.ts[, 2] |>
+  urca::ur.kpss() |>
+  urca::summary()
+```
+
+```{r}
+employees.ts[, 2] |>
+  ndiffs()
+```
+
+```{r}
+employees.ts[, 2] |>
+  diff() |>
+  tsdisplay(lag.max = 36)
+```
+
+```{r}
+arima011110 <- employees.ts[, 2] |>
+  Arima(order = c(0, 1, 1), seasonal = c(1, 1, 0))
+summary(arima011110)
+```
+
+```{r}
+arima010011 <- employees.ts[, 2] |>
+  Arima(order = c(0, 1, 0), seasonal = c(0, 1, 1))
+summary(arima010011)
+```
+
+```{r}
+forecast011110 <- arima011110 |> forecast()
+forecast010011 <- arima010011 |> forecast()
+```
+
+```{r}
+autoplot(employees.ts[, 2]) +
+  autolayer(forecast011110, PI = F, series = "011110") +
+  autolayer(forecast010011, PI = F, series = "010011")
+```
+
+```{r}
+dts <- employees.ts[, 2]
+autoplot(employees.ts[, 2]) +
+  autolayer(forecast010011, PI = F, series = "010011") +
+  autolayer(forecast(Arima(dts, order = c(1, 1, 0), seasonal = c(0, 1, 1))), PI = F, series = "110011") +
+  autolayer(forecast(Arima(dts, order = c(0, 1, 1), seasonal = c(0, 1, 1))), PI = F, series = "011011") +
+  autolayer(forecast(Arima(dts, order = c(1, 1, 1), seasonal = c(0, 1, 1))), PI = F, series = "111011") +
+  autolayer(forecast(Arima(dts, order = c(1, 1, 1), seasonal = c(1, 1, 1))), PI = F, series = "111111") +
+  labs(title = "월별 신규 취업자에 대한 ARIMA 모델 비교", x = "연도", y = "취업자수")
+```
+
+## 6.8 TBATS 모델
+
+```{r}
+covid19.ts[, 2] |>
+  tbats() |>
+  forecast() |>
+  autoplot() +
+  labs(
+    title = "코로나 확진자(0-9세)에 대한 TBATS 모델 예측",
+    x = "시간",
+    y = "확진자수"
+  )
+```
+
+## 6.9 prophet 모델
+
+```{r}
+# install.packages("prophet")
+library(prophet)
+```
+
+```{r}
+students.prophet <- data.frame(ds = students$연도, y = students$학생수계)
+model.prophet.students <- prophet(students.prophet)
+future.students <- make_future_dataframe(model.prophet.students, periods = 10, freq = "year")
+forecast.students <- predict(model.prophet.students, future.students)
+```
+
+```{r}
+plot(model.prophet.students, forecast.students) +
+  ggrepel::geom_text_repel(
+    aes(label = scales::number(y, big.mark = ",", accuracy = 1)),
+    vjust = 1, size = 3
+  ) +
+  labs(
+    title = "전체 학생수에 대한 prophet 모델 예측 결과",
+    x = "연도",
+    y = "학생수"
+  ) +
+  scale_y_continuous(labels = scales::label_comma())
+```
+
+```{r}
+prophet_plot_components(model.prophet.students, forecast.students)
+```
+
+```{r}
+employees.prophet <- data.frame(ds = employees[, 1], y = employees[, 2])
+model.prophet.employees <- prophet(employees.prophet)
+future.employees <- make_future_dataframe(
+  model.prophet.employees,
+  periods = 10, freq = "month"
+)
+forecast.employees <- predict(model.prophet.employees, future.employees)
+plot(model.prophet.employees, forecast.employees) +
+  labs(
+    title = "월별 전체 취업자수에 대한 prophet 모델 예측 결과",
+    x = "연월", y = "취업자수"
+  ) +
+  scale_y_continuous(labels = scales::label_comma())
+```
+
+```{r}
+prophet_plot_components(model.prophet.employees, forecast.employees)
+```
+
+```{r}
+covid.prophet <- data.frame(ds = covid19$date, y = covid19$`0-9세`)
+model.prophet.covid <- prophet(covid.prophet,
+  yearly.seasonality = TRUE,
+  daily.seasonality = TRUE,
+  weekly.seasonality = TRUE
+)
+future.covid <- make_future_dataframe(
+  model.prophet.covid,
+  periods = 100, freq = "day"
+)
+forecast.covid <- predict(model.prophet.covid, future.covid)
+plot(model.prophet.covid, forecast.covid) +
+  labs(
+    title = "일별 코로나 확진자수에 대한 prophet 모델 예측 결과(0-9세)",
+    x = "연월",
+    y = "확진자수"
+  ) +
+  scale_y_continuous(labels = scales::label_comma())
+```
+
+```{r}
+prophet_plot_components(model.prophet.covid, forecast.covid)
+```
+
+## 6.10 신경망 모델
+
+```{r}
+students.ts[, 2] |>
+  nnetar() |>
+  forecast(PI = TRUE) |>
+  autoplot() +
+  labs(
+    title = "전체 학생수에 대한 신경망 모델 예측 결과",
+    x = "연도", y = "학생수"
+  )
+```
+
+```{r}
+employees.ts[, 2] |>
+  nnetar() |>
+  forecast(PI = TRUE) |>
+  autoplot() +
+  labs(
+    title = "신규 취업자수에 대한 신경망 모델 예측 결과",
+    x = "연도",
+    y = "취업자수"
+  )
+```
+
+```{r}
+covid19.ts[, 2] |>
+  nnetar(p = 22, P = 12) |>
+  forecast(h = 100, PI = TRUE) |>
+  autoplot() +
+  labs(
+    title = "코로나 확진자(0-9세)에 대한 신경망 모델 예측 결과",
+    x = "연도",
+    y = "확진자수"
+  )
+```
